@@ -49,7 +49,7 @@ function extractTags(title, desc) {
 }
 
 // ── INSERT JOB INTO DB ──
-function insertJob(db, job) {
+function insertJob(_, job) {
   try {
     const existing = get(
       'SELECT id FROM jobs WHERE source_url = ? OR (title = ? AND company = ?)',
@@ -88,7 +88,7 @@ function insertJob(db, job) {
 // ══════════════════════════════════════════
 // SCRAPER 1: RemoteOK (JSON API)
 // ══════════════════════════════════════════
-async function scrapeRemoteOK(db) {
+async function scrapeRemoteOK() {
   const start = Date.now();
   let added = 0, found = 0;
 
@@ -122,13 +122,13 @@ async function scrapeRemoteOK(db) {
         source_url:   item.url || `https://remoteok.com/l/${item.id}`
       };
 
-      if (insertJob(db, job)) added++;
+      if (insertJob(null, job)) added++;
     }
 
-    logScrape(db, 'remoteok', found, added, 'success', '', Date.now() - start);
+    logScrape(null, 'remoteok', found, added, 'success', '', Date.now() - start);
     console.log(`✅ RemoteOK: ${added} new jobs added`);
   } catch (err) {
-    logScrape(db, 'remoteok', found, added, 'error', err.message, Date.now() - start);
+    logScrape(null, 'remoteok', found, added, 'error', err.message, Date.now() - start);
     console.error('❌ RemoteOK error:', err.message);
   }
 
@@ -138,7 +138,7 @@ async function scrapeRemoteOK(db) {
 // ══════════════════════════════════════════
 // SCRAPER 2: Jobicy (JSON API)
 // ══════════════════════════════════════════
-async function scrapeJobicy(db) {
+async function scrapeJobicy() {
   const start = Date.now();
   let added = 0, found = 0;
 
@@ -170,13 +170,13 @@ async function scrapeJobicy(db) {
         source_url:  item.url || ''
       };
 
-      if (insertJob(db, job)) added++;
+      if (insertJob(null, job)) added++;
     }
 
-    logScrape(db, 'jobicy', found, added, 'success', '', Date.now() - start);
+    logScrape(null, 'jobicy', found, added, 'success', '', Date.now() - start);
     console.log(`✅ Jobicy: ${added} new jobs added`);
   } catch (err) {
-    logScrape(db, 'jobicy', found, added, 'error', err.message, Date.now() - start);
+    logScrape(null, 'jobicy', found, added, 'error', err.message, Date.now() - start);
     console.error('❌ Jobicy error:', err.message);
   }
 
@@ -186,7 +186,7 @@ async function scrapeJobicy(db) {
 // ══════════════════════════════════════════
 // SCRAPER 3: We Work Remotely (HTML scraper)
 // ══════════════════════════════════════════
-async function scrapeWeWorkRemotely(db) {
+async function scrapeWeWorkRemotely() {
   const start = Date.now();
   let added = 0, found = 0;
 
@@ -227,13 +227,13 @@ async function scrapeWeWorkRemotely(db) {
         source_url:  url
       };
 
-      if (insertJob(db, job)) added++;
+      if (insertJob(null, job)) added++;
     });
 
-    logScrape(db, 'weworkremotely', found, added, 'success', '', Date.now() - start);
+    logScrape(null, 'weworkremotely', found, added, 'success', '', Date.now() - start);
     console.log(`✅ WeWorkRemotely: ${added} new jobs added`);
   } catch (err) {
-    logScrape(db, 'weworkremotely', found, added, 'error', err.message, Date.now() - start);
+    logScrape(null, 'weworkremotely', found, added, 'error', err.message, Date.now() - start);
     console.error('❌ WeWorkRemotely error:', err.message);
   }
 
@@ -243,7 +243,7 @@ async function scrapeWeWorkRemotely(db) {
 // ══════════════════════════════════════════
 // SCRAPER 4: Freelancer.com RSS Feed
 // ══════════════════════════════════════════
-async function scrapeFreelancerRSS(db) {
+async function scrapeFreelancerRSS() {
   const start = Date.now();
   let added = 0, found = 0;
 
@@ -285,14 +285,14 @@ async function scrapeFreelancerRSS(db) {
           source_url:  url
         };
 
-        if (insertJob(db, job)) added++;
+        if (insertJob(null, job)) added++;
       });
     } catch (err) {
       console.error('Freelancer RSS error:', err.message);
     }
   }
 
-  logScrape(db, 'freelancer', found, added, 'success', '', Date.now() - start);
+  logScrape(null, 'freelancer', found, added, 'success', '', Date.now() - start);
   console.log(`✅ Freelancer RSS: ${added} new jobs added`);
   return added;
 }
@@ -300,7 +300,7 @@ async function scrapeFreelancerRSS(db) {
 // ══════════════════════════════════════════
 // SCRAPER 5: Problogger Job Board RSS
 // ══════════════════════════════════════════
-async function scrapeProBlogger(db) {
+async function scrapeProBlogger() {
   const start = Date.now();
   let added = 0, found = 0;
 
@@ -335,13 +335,13 @@ async function scrapeProBlogger(db) {
         source_url:  url
       };
 
-      if (insertJob(db, job)) added++;
+      if (insertJob(null, job)) added++;
     });
 
-    logScrape(db, 'problogger', found, added, 'success', '', Date.now() - start);
+    logScrape(null, 'problogger', found, added, 'success', '', Date.now() - start);
     console.log(`✅ ProBlogger: ${added} new jobs added`);
   } catch (err) {
-    logScrape(db, 'problogger', found, added, 'error', err.message, Date.now() - start);
+    logScrape(null, 'problogger', found, added, 'error', err.message, Date.now() - start);
     console.error('❌ ProBlogger error:', err.message);
   }
 
@@ -349,7 +349,7 @@ async function scrapeProBlogger(db) {
 }
 
 // ── LOG SCRAPE RESULT ──
-function logScrape(db, source, found, added, status, error, duration) {
+function logScrape(_, source, found, added, status, error, duration) {
   try {
     run('INSERT INTO scrape_log (source, jobs_found, jobs_added, status, error, duration_ms) VALUES (?, ?, ?, ?, ?, ?)',
       [source, found, added, status, error, duration]);
@@ -357,7 +357,7 @@ function logScrape(db, source, found, added, status, error, duration) {
 }
 
 // ── EXPIRE OLD JOBS ──
-function expireOldJobs(db) {
+function expireOldJobs() {
   try {
     run("UPDATE jobs SET is_active = 0 WHERE expires_at < datetime('now') AND is_active = 1");
     console.log('⏰ Expired old jobs');
@@ -369,17 +369,17 @@ async function runAllScrapers() {
   console.log(`\n🔍 Starting scrape run: ${new Date().toISOString()}`);
   
 
-  expireOldJobs(db);
+  expireOldJobs();
 
   let totalAdded = 0;
-  totalAdded += await scrapeRemoteOK(db);
-  totalAdded += await scrapeJobicy(db);
-  totalAdded += await scrapeWeWorkRemotely(db);
-  totalAdded += await scrapeFreelancerRSS(db);
-  totalAdded += await scrapeProBlogger(db);
+  totalAdded += await scrapeRemoteOK();
+  totalAdded += await scrapeJobicy();
+  totalAdded += await scrapeWeWorkRemotely();
+  totalAdded += await scrapeFreelancerRSS();
+  totalAdded += await scrapeProBlogger();
 
   console.log(`\n✅ Scrape complete. Total new jobs: ${totalAdded}`);
-  console.log(`📊 Total active jobs: ${db.prepare('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1').get().c}\n`);
+  const _t = get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1'); console.log(`\n✅ Scrape complete. New: ${totalAdded}, Total: ${_t?.c||0}\n`);
 
   return totalAdded;
 }
