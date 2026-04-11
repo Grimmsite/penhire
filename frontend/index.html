@@ -589,11 +589,11 @@
   .success-state p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
 
   /* ── MOBILE BOTTOM NAV ── */
-  .mobile-bottom-nav {
-    display: none;
-  }
+  .mobile-bottom-nav { display: none; }
 
   @media (max-width: 768px) {
+    body { padding-bottom: 70px; }
+
     .mobile-bottom-nav {
       display: flex;
       position: fixed;
@@ -602,69 +602,74 @@
       background: rgba(247,244,239,0.97);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
-      border-top: 1px solid rgba(201,168,76,0.25);
-      padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+      border-top: 1px solid rgba(201,168,76,0.2);
+      padding: 6px 2px calc(6px + env(safe-area-inset-bottom));
       justify-content: space-around;
       align-items: center;
-      box-shadow: 0 -4px 24px rgba(15,14,12,0.10);
+      box-shadow: 0 -4px 20px rgba(15,14,12,0.09);
     }
 
     .mob-nav-item {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
-      padding: 6px 8px;
+      gap: 2px;
+      padding: 5px 6px;
       border-radius: 10px;
       text-decoration: none;
       color: var(--muted);
-      font-size: 0.6rem;
+      font-size: 0.55rem;
       font-weight: 600;
       letter-spacing: 0.02em;
       text-transform: uppercase;
-      transition: all 0.2s;
-      min-width: 52px;
+      transition: color 0.2s;
+      min-width: 46px;
       border: none;
       background: none;
       cursor: pointer;
       font-family: 'DM Sans', sans-serif;
+      position: relative;
     }
 
     .mob-nav-item .mob-icon {
-      font-size: 1.25rem;
+      font-size: 1.1rem;
       line-height: 1;
       transition: transform 0.2s;
     }
 
-    .mob-nav-item:hover,
-    .mob-nav-item.active {
-      color: var(--ink);
+    /* Active dot indicator — works on ALL buttons equally */
+    .mob-nav-item::after {
+      content: '';
+      position: absolute;
+      bottom: -2px; left: 50%;
+      transform: translateX(-50%);
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: var(--gold);
+      opacity: 0;
+      transition: opacity 0.2s;
     }
 
-    .mob-nav-item.active .mob-icon {
-      transform: translateY(-2px);
-    }
+    .mob-nav-item.active { color: var(--ink); }
+    .mob-nav-item.active::after { opacity: 1; }
+    .mob-nav-item.active .mob-icon { transform: translateY(-2px); }
 
-    .mob-nav-item.mob-profile.active,
-    .mob-nav-item.mob-profile:hover {
-      color: var(--gold);
-    }
-
+    /* Post a Job pill style */
     .mob-nav-post {
-      background: var(--ink) !important;
+      background: var(--ink);
       color: var(--paper) !important;
-      border-radius: 12px !important;
-      padding: 8px 10px !important;
+      border-radius: 10px;
+      padding: 5px 8px;
     }
-
-    .mob-nav-post:hover,
     .mob-nav-post.active {
-      background: var(--gold) !important;
+      background: var(--gold);
       color: var(--ink) !important;
     }
+    .mob-nav-post.active::after { display: none; }
 
-    /* Push page content above bottom nav */
-    body { padding-bottom: 80px; }
+    /* Profile active = gold */
+    .mob-profile.active { color: var(--gold); }
+    .mob-profile.active::after { background: var(--gold); }
   }
 
   /* ── RESPONSIVE ── */
@@ -1214,25 +1219,20 @@
 
 <!-- ── MOBILE BOTTOM NAV ── -->
 <nav class="mobile-bottom-nav" id="mobileBottomNav">
-  <a href="#jobs" class="mob-nav-item" id="mob-jobs" onclick="setMobActive('mob-jobs')">
-    <span class="mob-icon">🔍</span>
-    Browse Jobs
+  <a href="#jobs" class="mob-nav-item" id="mob-jobs">
+    <span class="mob-icon">🔍</span>Browse Jobs
   </a>
-  <a href="#how-it-works" class="mob-nav-item" id="mob-how" onclick="setMobActive('mob-how')">
-    <span class="mob-icon">💡</span>
-    How It Works
+  <a href="#how-it-works" class="mob-nav-item" id="mob-how">
+    <span class="mob-icon">💡</span>How It Works
   </a>
-  <a href="#pricing" class="mob-nav-item" id="mob-pricing" onclick="setMobActive('mob-pricing')">
-    <span class="mob-icon">💳</span>
-    Pricing
+  <a href="#pricing" class="mob-nav-item" id="mob-pricing">
+    <span class="mob-icon">💳</span>Pricing
   </a>
-  <a href="#post-job" class="mob-nav-item mob-nav-post" id="mob-post" onclick="setMobActive('mob-post')">
-    <span class="mob-icon">✍️</span>
-    Post a Job
+  <a href="#post-job" class="mob-nav-item mob-nav-post" id="mob-post">
+    <span class="mob-icon">✍️</span>Post a Job
   </a>
   <button class="mob-nav-item mob-profile" id="mob-profile" onclick="handleMobProfile()">
-    <span class="mob-icon">👤</span>
-    Profile
+    <span class="mob-icon">👤</span>Profile
   </button>
 </nav>
 
@@ -1630,6 +1630,13 @@ function showToast(msg, type = 'success') {
 }
 
 // ── MOBILE BOTTOM NAV ──
+const MOB_SECTIONS = [
+  { sectionId: 'jobs',         navId: 'mob-jobs'    },
+  { sectionId: 'how-it-works', navId: 'mob-how'     },
+  { sectionId: 'pricing',      navId: 'mob-pricing' },
+  { sectionId: 'post-job',     navId: 'mob-post'    },
+];
+
 function setMobActive(id) {
   document.querySelectorAll('.mob-nav-item').forEach(el => el.classList.remove('active'));
   const el = document.getElementById(id);
@@ -1639,34 +1646,32 @@ function setMobActive(id) {
 function handleMobProfile() {
   setMobActive('mob-profile');
   const token = localStorage.getItem('ph_token');
-  if (token) {
-    showUserMenu();
-  } else {
-    openModal('auth');
-  }
+  if (token) { showUserMenu(); } else { openModal('auth'); }
 }
 
-// Auto-highlight active nav item based on scroll position
-function updateMobNavOnScroll() {
-  const sections = [
-    { id: 'jobs',         mob: 'mob-jobs'    },
-    { id: 'how-it-works', mob: 'mob-how'     },
-    { id: 'pricing',      mob: 'mob-pricing' },
-    { id: 'post-job',     mob: 'mob-post'    },
-  ];
-  const scrollY = window.scrollY + window.innerHeight / 2;
-  let active = null;
-  sections.forEach(s => {
-    const el = document.getElementById(s.id);
-    if (el && el.offsetTop <= scrollY) active = s.mob;
+// Attach click handlers to anchor items
+MOB_SECTIONS.forEach(({ navId }) => {
+  const el = document.getElementById(navId);
+  if (el) el.addEventListener('click', () => setMobActive(navId));
+});
+
+// Scroll-based active highlight — uses IntersectionObserver for accuracy
+function initMobScrollTracker() {
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const match = MOB_SECTIONS.find(s => s.sectionId === entry.target.id);
+        if (match) setMobActive(match.navId);
+      }
+    });
+  }, { threshold: 0.35 });
+
+  MOB_SECTIONS.forEach(({ sectionId }) => {
+    const el = document.getElementById(sectionId);
+    if (el) io.observe(el);
   });
-  if (active) {
-    document.querySelectorAll('.mob-nav-item').forEach(el => el.classList.remove('active'));
-    const el = document.getElementById(active);
-    if (el) el.classList.add('active');
-  }
 }
-window.addEventListener('scroll', updateMobNavOnScroll, { passive: true });
+initMobScrollTracker();
 
 // ── INIT ──
 renderJobs(jobs);
