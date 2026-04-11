@@ -237,7 +237,14 @@ app.post('/api/paypal/create-job-order', async (req, res) => {
   const fee = feeMap[budget];
   if (!fee) return res.status(400).json({ error: 'Invalid budget' });
   try {
-    const order = await paypalLib.createOrder({ amount: fee, description: `PenHire Job: ${title}`, referenceId: `job-${Date.now()}` });
+    const BASE = process.env.BASE_URL || 'https://penhire.onrender.com';
+    const order = await paypalLib.createOrder({
+      amount:      fee,
+      description: `PenHire Job: ${title}`,
+      referenceId: `job-${Date.now()}`,
+      return_url:  `${BASE}/payment/success`,
+      cancel_url:  `${BASE}/payment/cancel`
+    });
     // Store job as inactive (pending admin approval), source = 'employer'
     run('INSERT INTO jobs (uuid, title, company, country, category, pay_min, pay_max, pay_type, description, requirements, apply_email, apply_url, tags, unlock_kes, unlock_usd, post_fee_usd, source, is_active) VALUES (?, ?, ?, "Remote", ?, 20, 100, "Per Project", ?, ?, ?, ?, "[]", 200, 2, ?, "employer", 0)',
       [order.orderId, title, employerName || 'Employer', category || 'blog', description, requirements || '', applyEmail, applyUrl || '', fee]);
@@ -251,15 +258,21 @@ app.post('/api/paypal/capture/:orderId', async (req, res) => {
   try {
     const result = await paypalLib.captureOrder(req.params.orderId);
     if (result.success) {
-      // Payment confirmed — update paypal record but keep job inactive (pending_approval)
+      // Find job by original PayPal orderId (stored as uuid at insert time)
+      const jobRow = get('SELECT id, title, company FROM jobs WHERE uuid = ?', [req.params.orderId]);
+      if (!jobRow) return res.status(404).json({ error: 'Job record not found. Contact support.' });
+
+      // Assign a permanent UUID now that payment is confirmed
       const newUuid = uuidv4();
-      run('UPDATE jobs SET expires_at = datetime("now", "+30 days"), uuid = ?, is_active = 0 WHERE uuid = ?',
-        [newUuid, req.params.orderId]);
+      run('UPDATE jobs SET expires_at = datetime("now", "+30 days"), uuid = ?, is_active = 0 WHERE id = ?',
+        [newUuid, jobRow.id]);
+
       // Log the paypal transaction
-      run('INSERT INTO paypal_transactions (paypal_order_id, payer_email, amount_usd, status, purpose, reference_id) VALUES (?, ?, ?, "completed", "job_posting", (SELECT id FROM jobs WHERE uuid = ?))',
-        [result.orderId, result.payerEmail, result.amount, newUuid]);
+      run('INSERT INTO paypal_transactions (paypal_order_id, payer_email, amount_usd, status, purpose, reference_id) VALUES (?, ?, ?, "completed", "job_posting", ?)',
+        [result.orderId, result.payerEmail, result.amount, jobRow.id]);
+
       // Notify admin to review and approve
-      const job = get('SELECT * FROM jobs WHERE uuid = ?', [newUuid]);
+      const job = get('SELECT * FROM jobs WHERE id = ?', [jobRow.id]);
       if (job) {
         emailLib.sendEmail({
           to: process.env.ADMIN_EMAIL,
@@ -459,7 +472,10 @@ app.post('/api/admin/scrape', adminRequired, (req, res) => {
 app.get('/admin',           (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'admin.html')));
 app.get('/jobs',            (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'jobs.html')));
 app.get('/post-job',        (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'post-job.html')));
-app.get('/payment/success', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'post-job.html')));
+app.get('/payment/success', (req, res) => {
+  // PayPal returns ?token=ORDER_ID&PayerID=... — serve post-job.html so checkPayPalReturn() can read them
+  res.sendFile(path.join(__dirname, 'frontend', 'post-job.html'));
+});
 app.get('/payment/cancel',  (req, res) => res.redirect('/post-job'));
 app.get('/job/:uuid',       (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'job-detail.html')));
 app.get('*', (req, res) => {

@@ -454,39 +454,51 @@ function resetForm() {
 
 // ── CHECK IF RETURNING FROM PAYPAL ──
 async function checkPayPalReturn() {
-  const params = new URLSearchParams(window.location.search);
-  const orderId = params.get('token');
-  const cancelled = params.get('cancelled');
+  const params    = new URLSearchParams(window.location.search);
+  // PayPal returns ?token=ORDER_ID after approval, ?cancelled=1 after cancellation
+  const orderId   = params.get('token');
+  const payerId   = params.get('PayerID');
+  const cancelled = params.get('cancelled') || (!orderId && params.has('token') === false && window.location.pathname === '/payment/cancel');
 
-  if (cancelled) {
-    showToast('Payment cancelled. You can try again.', 'error');
-    window.history.replaceState({}, '', '/post-job');
+  // Clean URL immediately so refresh doesn't re-trigger capture
+  window.history.replaceState({}, '', '/post-job');
+
+  if (cancelled || location.pathname === '/payment/cancel') {
+    showToast('Payment cancelled. Your form data is still here — try again when ready.', 'error');
     return;
   }
 
-  if (orderId) {
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true;
-    btn.textContent = '⏳ Confirming payment...';
-    try {
-      const res = await fetch(`/api/paypal/capture/${orderId}`, { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        document.getElementById('formFields').style.display = 'none';
-        document.getElementById('successState').style.display = 'block';
-        showToast('🎉 Job posted successfully!', 'success');
-        window.history.replaceState({}, '', '/post-job');
-      } else {
-        showToast(data.error || 'Payment could not be confirmed.', 'error');
-        btn.disabled = false;
-        btn.textContent = '📋 Post Job & Pay with PayPal →';
-        window.history.replaceState({}, '', '/post-job');
-      }
-    } catch(e) {
-      showToast('Could not confirm payment. Contact support.', 'error');
-      btn.disabled = false;
-      btn.textContent = '📋 Post Job & Pay with PayPal →';
+  if (!orderId) return; // Normal page load, nothing to do
+
+  // Show confirming state
+  const btn       = document.getElementById('submitBtn');
+  const formFields = document.getElementById('formFields');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Confirming your payment…'; }
+
+  // Show an overlay while we capture
+  const overlay = document.createElement('div');
+  overlay.id = 'captureOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(247,244,239,0.92);backdrop-filter:blur(8px);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:'DM Sans',sans-serif;';
+  overlay.innerHTML = '<div style="width:48px;height:48px;border-radius:50%;border:3px solid #ede9e0;border-top-color:#c9a84c;animation:spin 0.8s linear infinite;"></div><p style="font-size:1rem;font-weight:600;color:#0f0e0c;">Confirming your payment…</p><style>@keyframes spin{to{transform:rotate(360deg);}}</style>';
+  document.body.appendChild(overlay);
+
+  try {
+    const res  = await fetch(`/api/paypal/capture/${orderId}`, { method: 'POST' });
+    const data = await res.json();
+    overlay.remove();
+
+    if (data.success) {
+      if (formFields) formFields.style.display = 'none';
+      document.getElementById('successState').style.display = 'block';
+      document.getElementById('successState').scrollIntoView({ behavior: 'smooth' });
+    } else {
+      showToast(data.error || 'Payment could not be confirmed. Please contact support.', 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '📋 Post Job & Pay with PayPal →'; }
     }
+  } catch(e) {
+    overlay.remove();
+    showToast('Connection error confirming payment. Please contact support.', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '📋 Post Job & Pay with PayPal →'; }
   }
 }
 
