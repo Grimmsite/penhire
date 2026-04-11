@@ -1013,6 +1013,44 @@
   .status-badge.unlocked { background: rgba(74,103,65,0.1); color: var(--sage); }
   .status-badge.pending  { background: rgba(201,168,76,0.15); color: #a07820; }
   .status-badge.completed{ background: rgba(15,14,12,0.07); color: var(--ink); }
+  .status-badge.pending_approval { background: rgba(184,76,42,0.1); color: var(--rust); }
+
+  /* ── JOB LINK BUTTON IN PROFILE ── */
+  .job-link-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 8px;
+    background: var(--sage); color: #fff;
+    font-size: 0.75rem; font-weight: 700;
+    text-decoration: none; border: none; cursor: pointer;
+    transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+    white-space: nowrap;
+  }
+  .job-link-btn:hover { background: #3a5332; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(74,103,65,0.3); }
+
+  /* ── ADMIN PANEL CARD ── */
+  .admin-job-card {
+    background: var(--white); border: 1px solid rgba(15,14,12,0.08);
+    border-radius: 14px; padding: 16px 20px;
+    display: flex; gap: 14px; align-items: center;
+  }
+  html.dark .admin-job-card { background: var(--white); border-color: rgba(255,255,255,0.07); }
+  .admin-job-info { flex: 1; min-width: 0; }
+  .admin-job-title { font-size: 0.9rem; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+  .admin-job-meta  { font-size: 0.75rem; color: var(--muted); }
+  .admin-approve-btn {
+    padding: 8px 16px; border-radius: 8px;
+    background: var(--sage); color: #fff;
+    border: none; cursor: pointer; font-size: 0.8rem; font-weight: 700;
+    font-family: 'DM Sans', sans-serif; transition: all 0.2s; white-space: nowrap;
+  }
+  .admin-approve-btn:hover { background: #3a5332; }
+  .admin-link-input {
+    width: 100%; padding: 7px 10px; margin-top: 8px;
+    border: 1.5px solid rgba(15,14,12,0.12); border-radius: 8px;
+    font-size: 0.8rem; font-family: 'DM Sans', sans-serif;
+    background: var(--paper); color: var(--ink); outline: none;
+  }
+  html.dark .admin-link-input { background: var(--cream); border-color: rgba(255,255,255,0.1); }
   .pjc-pay { font-family: 'Playfair Display', serif; font-size: 0.95rem; font-weight: 700; color: var(--sage); flex-shrink: 0; }
 
   .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
@@ -1149,6 +1187,7 @@
     <a href="#how-it-works">How It Works</a>
     <a href="#pricing">Pricing</a>
     <a href="#post-job">Post a Job</a>
+    <a href="#" id="adminNavLink" onclick="openAdminPanel()" style="display:none; color:var(--rust) !important; font-weight:700 !important;">🛡️ Admin</a>
     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle dark mode" aria-label="Toggle dark mode"><span class="toggle-thumb">☀️</span></button>
     <a href="#" class="nav-cta" onclick="openModal('auth')">Sign In</a>
   </div>
@@ -1580,7 +1619,7 @@
     </div>
 
     <p style="font-size:0.85rem; color:var(--muted); margin-bottom:24px; line-height:1.6">
-      After payment, you'll immediately see the employer's full brief, contact email, and application instructions.
+      After payment, our team reviews and approves your unlock — usually within <strong style="color:var(--ink)">1–6 hours</strong>. You'll receive the direct job link once approved.
     </p>
 
     <div class="payment-options">
@@ -1617,7 +1656,56 @@
     </button>
 
     <div style="text-align:center; margin-top:12px; font-size:0.78rem; color:var(--muted);">
-      🔒 Secure payment · Instant unlock · No hidden fees
+      🔒 Secure payment · Admin reviewed · Job link sent on approval
+    </div>
+  </div>
+</div>
+
+<!-- ── PENDING APPROVAL MODAL ── -->
+<div class="modal-overlay" id="pendingModal">
+  <div class="modal" style="text-align:center; padding:48px 40px;">
+    <div style="font-size:3.5rem; margin-bottom:16px;">⏳</div>
+    <h2 style="margin-bottom:10px;">Payment Received!</h2>
+    <p class="sub" style="margin-bottom:24px;">Your payment has been confirmed. Our admin team is now reviewing your unlock request.</p>
+    <div style="background:var(--cream); border-radius:14px; padding:20px 24px; margin-bottom:24px; text-align:left;">
+      <div style="font-size:0.72rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--gold); margin-bottom:12px;">What Happens Next</div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; gap:12px; align-items:flex-start;">
+          <div style="width:28px; height:28px; border-radius:50%; background:rgba(201,168,76,0.15); display:flex; align-items:center; justify-content:center; font-size:0.8rem; flex-shrink:0;">✅</div>
+          <div><div style="font-size:0.85rem; font-weight:600; color:var(--ink);">Payment confirmed</div><div style="font-size:0.75rem; color:var(--muted);">Your unlock fee has been received</div></div>
+        </div>
+        <div style="display:flex; gap:12px; align-items:flex-start;">
+          <div style="width:28px; height:28px; border-radius:50%; background:rgba(201,168,76,0.15); display:flex; align-items:center; justify-content:center; font-size:0.8rem; flex-shrink:0;">🔍</div>
+          <div><div style="font-size:0.85rem; font-weight:600; color:var(--ink);">Admin review</div><div style="font-size:0.75rem; color:var(--muted);">Our team verifies your payment and assigns the job link</div></div>
+        </div>
+        <div style="display:flex; gap:12px; align-items:flex-start;">
+          <div style="width:28px; height:28px; border-radius:50%; background:rgba(201,168,76,0.15); display:flex; align-items:center; justify-content:center; font-size:0.8rem; flex-shrink:0;">🔓</div>
+          <div><div style="font-size:0.85rem; font-weight:600; color:var(--ink);">Job unlocked</div><div style="font-size:0.75rem; color:var(--muted);">Direct job link appears in your profile within 1–6 hours</div></div>
+        </div>
+      </div>
+    </div>
+    <div id="pendingJobInfo" style="background:rgba(201,168,76,0.08); border:1px solid rgba(201,168,76,0.25); border-radius:10px; padding:12px 16px; margin-bottom:24px; font-size:0.85rem; color:var(--ink);"></div>
+    <button class="form-submit" onclick="closeModal('pending'); openProfile(); switchProfileTab('jobs', document.querySelectorAll('.ptab')[1]);" style="margin-bottom:0;">
+      View My Jobs →
+    </button>
+  </div>
+</div>
+
+<!-- ── ADMIN PANEL MODAL (demo) ── -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal" style="max-width:600px;">
+    <button class="modal-close" onclick="closeModal('admin')">✕</button>
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:24px;">
+      <div style="font-size:1.8rem;">🛡️</div>
+      <div>
+        <h2 style="margin-bottom:2px;">Admin Panel</h2>
+        <p style="font-size:0.8rem; color:var(--muted); margin:0;">Review & approve unlock requests</p>
+      </div>
+    </div>
+    <div id="adminJobsList" style="display:flex; flex-direction:column; gap:12px; max-height:420px; overflow-y:auto;"></div>
+    <div id="adminEmpty" style="text-align:center; padding:40px 0; color:var(--muted); display:none;">
+      <div style="font-size:2.5rem; margin-bottom:12px;">✅</div>
+      <p>No pending approvals</p>
     </div>
   </div>
 </div>
@@ -1749,6 +1837,7 @@
       <div class="ptab-content" id="ptab-jobs">
         <div class="jobs-filter-strip">
           <button class="jf-btn active" onclick="filterProfileJobs('all', this)">All Jobs</button>
+          <button class="jf-btn" onclick="filterProfileJobs('pending_approval', this)">🕐 Awaiting Approval</button>
           <button class="jf-btn" onclick="filterProfileJobs('unlocked', this)">🔓 Unlocked</button>
           <button class="jf-btn" onclick="filterProfileJobs('pending', this)">⏳ Pending</button>
           <button class="jf-btn" onclick="filterProfileJobs('completed', this)">✅ Completed</button>
@@ -1985,13 +2074,13 @@ function openUnlock(jobId) {
 
 // ── MODAL CONTROLS ──
 function openModal(type) {
-  const map = { auth: 'authModal', unlock: 'unlockModal', postPay: 'postPayModal' };
+  const map = { auth: 'authModal', unlock: 'unlockModal', postPay: 'postPayModal', pending: 'pendingModal', admin: 'adminModal' };
   const el = document.getElementById(map[type]);
   if (el) el.classList.add('open');
 }
 
 function closeModal(type) {
-  const map = { auth: 'authModal', unlock: 'unlockModal', postPay: 'postPayModal' };
+  const map = { auth: 'authModal', unlock: 'unlockModal', postPay: 'postPayModal', pending: 'pendingModal', admin: 'adminModal' };
   const el = document.getElementById(map[type]);
   if (el) el.classList.remove('open');
 }
@@ -2072,7 +2161,6 @@ function processUnlock() {
       showToast('Enter a valid M-Pesa number', 'error');
       return;
     }
-    // Simulate M-Pesa STK push
     const btn = document.getElementById('unlockPayBtn');
     btn.textContent = '⏳ Sending M-Pesa prompt...';
     btn.disabled = true;
@@ -2082,25 +2170,138 @@ function processUnlock() {
         closeModal('unlock');
         btn.textContent = 'Pay & Unlock Job →';
         btn.disabled = false;
-        showJobDetails();
+        recordPendingUnlock();
       }, 3000);
     }, 2000);
   } else {
-    // PayPal flow
     showToast('Redirecting to PayPal...', 'success');
     setTimeout(() => {
       closeModal('unlock');
-      showJobDetails();
+      recordPendingUnlock();
     }, 1500);
   }
 }
 
-// ── SHOW JOB DETAILS AFTER UNLOCK ──
-function showJobDetails() {
+// ── RECORD PENDING UNLOCK (awaiting admin approval) ──
+function recordPendingUnlock() {
   if (!selectedJob) return;
-  showToast('🎉 Job unlocked! Check your email for full details.', 'success');
-  // In production, this would reveal the employer's email and full brief
+  const stored = JSON.parse(localStorage.getItem('ph_unlocked_jobs') || '[]');
+  const already = stored.find(j => j.id === selectedJob.id);
+  if (!already) {
+    stored.push({
+      id: selectedJob.id,
+      title: selectedJob.title,
+      company: selectedJob.company,
+      pay: selectedJob.pay,
+      icon: selectedJob.icon,
+      status: 'pending_approval',
+      date: new Date().toLocaleDateString('en-KE', { day:'numeric', month:'short', year:'numeric' }),
+      jobLink: null
+    });
+    localStorage.setItem('ph_unlocked_jobs', JSON.stringify(stored));
+  }
+
+  // Also queue in admin pending list
+  const adminQueue = JSON.parse(localStorage.getItem('ph_admin_queue') || '[]');
+  const alreadyQueued = adminQueue.find(j => j.id === selectedJob.id);
+  if (!alreadyQueued) {
+    adminQueue.push({
+      id: selectedJob.id,
+      title: selectedJob.title,
+      company: selectedJob.company,
+      pay: selectedJob.pay,
+      icon: selectedJob.icon,
+      paidBy: JSON.parse(localStorage.getItem('ph_user') || '{}').name || 'User',
+      paidAt: new Date().toLocaleString('en-KE')
+    });
+    localStorage.setItem('ph_admin_queue', JSON.stringify(adminQueue));
+  }
+
+  // Show pending approval modal
+  document.getElementById('pendingJobInfo').innerHTML =
+    `<strong>${selectedJob.icon} ${selectedJob.title}</strong> — ${selectedJob.company}<br>
+     <span style="font-size:0.78rem; color:var(--muted);">Submitted ${new Date().toLocaleString('en-KE')}</span>`;
+  openModal('pending');
+  // Refresh profile if open
+  if (document.getElementById('profileOverlay').classList.contains('open')) loadProfileData();
 }
+
+// ── ADMIN PANEL ──
+function openAdminPanel() {
+  renderAdminQueue();
+  openModal('admin');
+}
+
+function renderAdminQueue() {
+  const queue = JSON.parse(localStorage.getItem('ph_admin_queue') || '[]');
+  const listEl = document.getElementById('adminJobsList');
+  const emptyEl = document.getElementById('adminEmpty');
+
+  if (!queue.length) {
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+  listEl.innerHTML = queue.map((job, idx) => `
+    <div class="admin-job-card" id="adminCard-${idx}">
+      <div style="font-size:1.8rem; flex-shrink:0;">${job.icon}</div>
+      <div class="admin-job-info">
+        <div class="admin-job-title">${job.title}</div>
+        <div class="admin-job-meta">🏢 ${job.company} · 💰 ${job.pay}<br>👤 Paid by: ${job.paidBy} · 🕐 ${job.paidAt}</div>
+        <input class="admin-link-input" id="adminLink-${idx}" placeholder="Paste job URL here (e.g. https://upwork.com/jobs/...)" />
+      </div>
+      <button class="admin-approve-btn" onclick="approveUnlock(${idx})">Approve & Send Link ✓</button>
+    </div>
+  `).join('');
+}
+
+function approveUnlock(idx) {
+  const queue = JSON.parse(localStorage.getItem('ph_admin_queue') || '[]');
+  const job = queue[idx];
+  const link = document.getElementById('adminLink-' + idx).value.trim();
+
+  if (!link || !link.startsWith('http')) {
+    showToast('Please enter a valid job URL (starting with https://)', 'error');
+    return;
+  }
+
+  // Update user's job status → unlocked with link
+  const stored = JSON.parse(localStorage.getItem('ph_unlocked_jobs') || '[]');
+  const jobEntry = stored.find(j => j.id === job.id);
+  if (jobEntry) {
+    jobEntry.status = 'unlocked';
+    jobEntry.jobLink = link;
+    jobEntry.unlockedAt = new Date().toLocaleString('en-KE');
+    localStorage.setItem('ph_unlocked_jobs', JSON.stringify(stored));
+  }
+
+  // Remove from admin queue
+  queue.splice(idx, 1);
+  localStorage.setItem('ph_admin_queue', JSON.stringify(queue));
+
+  showToast(`✅ Unlocked: ${job.title}`, 'success');
+  renderAdminQueue();
+  // Refresh profile if open
+  if (document.getElementById('profileOverlay').classList.contains('open')) loadProfileData();
+}
+
+// Check if admin mode (type "admin" in console: enableAdmin())
+function enableAdmin() {
+  localStorage.setItem('ph_admin', '1');
+  const link = document.getElementById('adminNavLink');
+  if (link) link.style.display = 'inline';
+  showToast('🛡️ Admin mode enabled', 'success');
+}
+// Auto-show admin link if previously enabled
+(function() {
+  if (localStorage.getItem('ph_admin') === '1') {
+    window.addEventListener('DOMContentLoaded', () => {
+      const link = document.getElementById('adminNavLink');
+      if (link) link.style.display = 'inline';
+    });
+  }
+})();
 
 // ── PROCESS POST PAYMENT ──
 function processPostPayment() {
@@ -2315,8 +2516,9 @@ function loadProfileData() {
 
   // Update stats
   const completed = stored.filter(j => j.status === 'completed').length;
+  const unlocked  = stored.filter(j => j.status === 'unlocked').length;
   const totalEarned = stored.filter(j => j.status === 'completed').reduce((s,j) => s + (j.earnedAmount || 0), 0);
-  document.getElementById('pstatUnlocked').textContent = stored.length;
+  document.getElementById('pstatUnlocked').textContent = unlocked;
   document.getElementById('pstatCompleted').textContent = completed;
   document.getElementById('pstatEarned').textContent = '$' + totalEarned;
   document.getElementById('overviewEarned').textContent = '$' + totalEarned;
@@ -2333,10 +2535,14 @@ function buildActivityFeed(jobs, memberSince) {
   const items = [];
 
   jobs.slice(-4).reverse().forEach(job => {
+    const isPendingApproval = job.status === 'pending_approval';
     items.push({
-      icon: job.status === 'completed' ? '✅' : job.status === 'pending' ? '⏳' : '🔓',
-      cls:  job.status === 'completed' ? 'sage' : job.status === 'pending' ? 'gold' : 'gold',
-      title: job.status === 'completed' ? 'Completed: ' + job.title : job.status === 'pending' ? 'Applied: ' + job.title : 'Unlocked: ' + job.title,
+      icon: job.status === 'completed' ? '✅' : isPendingApproval ? '🕐' : job.status === 'pending' ? '⏳' : '🔓',
+      cls:  job.status === 'completed' ? 'sage' : 'gold',
+      title: job.status === 'completed' ? 'Completed: ' + job.title
+           : isPendingApproval ? 'Awaiting approval: ' + job.title
+           : job.status === 'pending' ? 'Applied: ' + job.title
+           : 'Unlocked: ' + job.title,
       time: job.date || 'Recently',
       amount: job.status === 'completed' ? '$' + (job.earnedAmount||0) : ''
     });
@@ -2370,29 +2576,51 @@ function renderProfileJobs(filter) {
 
   if (!filtered.length) {
     const msgs = {
-      all:       '💼 No jobs yet. Browse and unlock your first opportunity!',
-      unlocked:  '🔓 No unlocked jobs. Find a job and unlock it to apply.',
-      pending:   '⏳ No pending applications yet.',
-      completed: '✅ No completed jobs yet. Keep applying!'
+      all:              '💼 No jobs yet. Browse and unlock your first opportunity!',
+      unlocked:         '🔓 No unlocked jobs yet. Approved jobs will appear here.',
+      pending_approval: '🕐 No jobs awaiting approval.',
+      pending:          '⏳ No pending applications yet.',
+      completed:        '✅ No completed jobs yet. Keep applying!'
     };
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">${filter === 'all' ? '💼' : filter === 'unlocked' ? '🔓' : filter === 'pending' ? '⏳' : '✅'}</div><p>${msgs[filter]}</p></div>`;
+    const icons = { all:'💼', unlocked:'🔓', pending_approval:'🕐', pending:'⏳', completed:'✅' };
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">${icons[filter]||'💼'}</div><p>${msgs[filter]||msgs.all}</p></div>`;
     return;
   }
 
-  list.innerHTML = filtered.map(job => `
+  list.innerHTML = filtered.map(job => {
+    const statusLabel = {
+      pending_approval: '🕐 Awaiting Approval',
+      unlocked: '🔓 Unlocked',
+      pending: '⏳ Pending',
+      completed: '✅ Completed'
+    }[job.status] || job.status;
+
+    const linkBtn = (job.status === 'unlocked' && job.jobLink)
+      ? `<a class="job-link-btn" href="${job.jobLink}" target="_blank" rel="noopener">🔗 Open Job</a>`
+      : '';
+
+    const pendingNote = job.status === 'pending_approval'
+      ? `<div style="font-size:0.72rem; color:var(--rust); margin-top:5px;">⏳ Payment received — admin will approve within 1–6 hrs</div>`
+      : '';
+
+    return `
     <div class="profile-job-card">
       <div class="pjc-icon">${job.icon || '✍️'}</div>
       <div class="pjc-info">
         <div class="pjc-title">${job.title}</div>
         <div class="pjc-company">${job.company || 'Remote Employer'}</div>
         <div class="pjc-meta">
-          <span class="status-badge ${job.status}">${job.status}</span>
+          <span class="status-badge ${job.status}">${statusLabel}</span>
           <span style="font-size:0.75rem;color:var(--muted)">${job.date || ''}</span>
         </div>
+        ${pendingNote}
       </div>
-      <div class="pjc-pay">${job.pay || ''}</div>
-    </div>
-  `).join('');
+      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0;">
+        <div class="pjc-pay">${job.pay || ''}</div>
+        ${linkBtn}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function saveProfileInfo() {
