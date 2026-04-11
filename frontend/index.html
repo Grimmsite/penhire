@@ -22,7 +22,6 @@
     --shadow-lg: 0 12px 48px rgba(15,14,12,0.16);
   }
 
-
   /* ── DARK MODE ── */
   html.dark {
     --ink: #ede9df;
@@ -818,7 +817,6 @@
   .success-icon { font-size: 3.5rem; margin-bottom: 16px; }
   .success-state h3 { font-size: 1.5rem; margin-bottom: 8px; }
   .success-state p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
-
 
   /* ── PROFILE PANEL ── */
   .profile-overlay {
@@ -2788,7 +2786,6 @@ function showToast(msg, type = 'success') {
   setTimeout(() => toast.classList.remove('show'), 4000);
 }
 
-
 // ── PROFILE PANEL ──
 let profileJobsData = [];
 let currentJobFilter = 'all';
@@ -3071,10 +3068,10 @@ function logoutUser() {
 
 // ── MOBILE BOTTOM NAV ──
 const MOB_SECTIONS = [
-  
+
   { sectionId: 'how-it-works', navId: 'mob-how'     },
   { sectionId: 'pricing',      navId: 'mob-pricing' },
-  
+
 ];
 
 function setMobActive(id) {
@@ -3113,7 +3110,6 @@ function initMobScrollTracker() {
   });
 }
 initMobScrollTracker();
-
 
 // ── THEME TOGGLE ──
 function applyTheme(dark) {
