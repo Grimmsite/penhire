@@ -456,11 +456,12 @@ app.post('/api/admin/scrape', adminRequired, (req, res) => {
 });
 
 // ── SERVE FRONTEND ──
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'admin.html')));
-app.get('/jobs', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'jobs.html')));
-app.get('/post-job', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'post-job.html')));
+app.get('/admin',           (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'admin.html')));
+app.get('/jobs',            (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'jobs.html')));
+app.get('/post-job',        (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'post-job.html')));
 app.get('/payment/success', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'post-job.html')));
-app.get('/payment/cancel', (req, res) => res.redirect('/post-job'));
+app.get('/payment/cancel',  (req, res) => res.redirect('/post-job'));
+app.get('/job/:uuid',       (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'job-detail.html')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
 });

@@ -1,203 +1,253 @@
-// backend/email.js
-// Automated email notifications for all platform events
+// backend/email.js — PenHire Email Service
 
 const nodemailer = require('nodemailer');
-require('dotenv').config();
 
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: parseInt(process.env.EMAIL_PORT),
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+// ── TRANSPORT ──
+function getTransport() {
+  return nodemailer.createTransport({
+    host:   process.env.SMTP_HOST   || 'smtp.gmail.com',
+    port:   parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+}
 
-const BRAND_COLOR = '#c9a84c';
-const DARK = '#0f0e0c';
+const BASE_URL  = process.env.BASE_URL  || 'https://penhire.onrender.com';
+const FROM_NAME = process.env.FROM_NAME || 'PenHire';
+const FROM_ADDR = process.env.SMTP_USER || 'noreply@penhire.com';
+const FROM      = `"${FROM_NAME}" <${FROM_ADDR}>`;
 
-// ── BASE EMAIL TEMPLATE ──
-function baseTemplate(content) {
-  return `
-<!DOCTYPE html>
+// ── SHARED STYLES ──
+const FONT  = `font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;`;
+const GOLD  = '#c9a84c';
+const INK   = '#0f0e0c';
+const PAPER = '#f7f4ef';
+const SAGE  = '#4a6741';
+const MUTED = '#8a8478';
+
+function baseTemplate(contentHtml) {
+  return `<!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { font-family: Georgia, serif; background: #f7f4ef; margin: 0; padding: 0; }
-    .wrapper { max-width: 580px; margin: 0 auto; padding: 40px 20px; }
-    .card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
-    .header { background: ${DARK}; padding: 32px 40px; text-align: center; }
-    .logo { color: white; font-size: 24px; font-weight: bold; text-decoration: none; }
-    .logo span { color: ${BRAND_COLOR}; }
-    .body { padding: 40px; }
-    h2 { color: ${DARK}; font-size: 22px; margin: 0 0 16px; }
-    p { color: #555; line-height: 1.7; font-size: 15px; margin: 0 0 16px; font-family: Arial, sans-serif; }
-    .btn { display: inline-block; background: ${BRAND_COLOR}; color: ${DARK};
-           padding: 14px 32px; border-radius: 8px; text-decoration: none;
-           font-weight: bold; font-size: 15px; margin: 8px 0; }
-    .highlight { background: #f7f4ef; border-left: 4px solid ${BRAND_COLOR};
-                 padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 20px 0; }
-    .highlight strong { color: ${DARK}; font-size: 16px; }
-    .footer-note { text-align: center; color: #aaa; font-size: 12px;
-                   font-family: Arial, sans-serif; margin-top: 24px; }
-    .divider { border: none; border-top: 1px solid #eee; margin: 24px 0; }
-  </style>
-</head>
-<body>
-  <div class="wrapper">
-    <div class="card">
-      <div class="header">
-        <div class="logo">✒ Pen<span>Hire</span></div>
-      </div>
-      <div class="body">
-        ${content}
-      </div>
-    </div>
-    <div class="footer-note">
-      © 2026 PenHire · Kenya's Writing Jobs Platform<br>
-      <a href="${process.env.BASE_URL}" style="color: ${BRAND_COLOR};">penhire.com</a>
-    </div>
-  </div>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#ede9e0;${FONT}">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#ede9e0;padding:40px 20px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+      <!-- HEADER -->
+      <tr>
+        <td style="background:${INK};border-radius:16px 16px 0 0;padding:32px 40px;text-align:center;">
+          <a href="${BASE_URL}" style="text-decoration:none;">
+            <span style="${FONT}font-size:28px;font-weight:900;color:${PAPER};letter-spacing:-0.5px;">
+              ✒ Pen<span style="color:${GOLD}">Hire</span>
+            </span>
+          </a>
+        </td>
+      </tr>
+
+      <!-- BODY -->
+      <tr>
+        <td style="background:#ffffff;padding:40px 40px 32px;">
+          ${contentHtml}
+        </td>
+      </tr>
+
+      <!-- FOOTER -->
+      <tr>
+        <td style="background:${INK};border-radius:0 0 16px 16px;padding:24px 40px;text-align:center;">
+          <p style="margin:0;${FONT}font-size:12px;color:rgba(247,244,239,0.4);line-height:1.6;">
+            © ${new Date().getFullYear()} PenHire · Writing Jobs for Kenyan Writers<br>
+            <a href="${BASE_URL}" style="color:${GOLD};text-decoration:none;">penhire.com</a>
+            &nbsp;·&nbsp;
+            <a href="mailto:${FROM_ADDR}" style="color:${GOLD};text-decoration:none;">Contact Support</a>
+          </p>
+        </td>
+      </tr>
+
+    </table>
+  </td></tr>
+</table>
 </body>
 </html>`;
 }
 
-// ── SEND EMAIL ──
+// ── GENERIC SEND ──
 async function sendEmail({ to, subject, html }) {
-  try {
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to, subject, html
-    });
-    return { success: true };
-  } catch (err) {
-    console.error('Email error:', err.message);
-    return { success: false, error: err.message };
-  }
+  const transport = getTransport();
+  await transport.sendMail({ from: FROM, to, subject, html });
 }
 
-// ── WELCOME EMAIL (Writer) ──
+// ── WELCOME EMAIL ──
 async function sendWelcome(user) {
   const html = baseTemplate(`
-    <h2>Welcome to PenHire, ${user.name}! ✒</h2>
-    <p>Your account is live. You can now browse and unlock writing jobs from employers in the US, UK, Canada, and Australia.</p>
-    <div class="highlight">
-      <strong>How to get started:</strong><br><br>
-      <span style="font-family:Arial;font-size:14px;color:#555;">
-        1. Browse the latest jobs at penhire.com/jobs<br>
-        2. Find a job that matches your skills<br>
-        3. Pay the small unlock fee via M-Pesa<br>
-        4. Get the employer's details and apply directly<br>
-        5. Get paid in dollars 🎉
-      </span>
-    </div>
-    <a href="${process.env.BASE_URL}/jobs" class="btn">Browse Jobs Now →</a>
-    <hr class="divider">
-    <p style="font-size:13px;">Questions? Reply to this email and we'll help you out.</p>
+    <h1 style="margin:0 0 8px;${FONT}font-size:26px;font-weight:900;color:${INK};">
+      Welcome to PenHire, ${user.name.split(' ')[0]}! 🎉
+    </h1>
+    <p style="margin:0 0 28px;${FONT}font-size:15px;color:${MUTED};line-height:1.6;">
+      Your account is live. You now have access to hundreds of real writing jobs
+      from employers in the US, UK, Canada, and Australia.
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:${PAPER};border-radius:12px;padding:24px;margin-bottom:28px;">
+      <tr>
+        <td>
+          <p style="margin:0 0 6px;${FONT}font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${GOLD};">Your Account</p>
+          <p style="margin:0 0 4px;${FONT}font-size:14px;color:${INK};"><strong>Name:</strong> ${user.name}</p>
+          <p style="margin:0 0 4px;${FONT}font-size:14px;color:${INK};"><strong>Email:</strong> ${user.email}</p>
+          <p style="margin:0;${FONT}font-size:14px;color:${INK};"><strong>Speciality:</strong> ${user.speciality || 'General Writing'}</p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:0 0 20px;${FONT}font-size:14px;color:${MUTED};line-height:1.7;">
+      Browse jobs, unlock the ones that interest you with a small M-Pesa fee, and apply directly to employers.
+      No middlemen. No commissions. Get paid in dollars.
+    </p>
+
+    <a href="${BASE_URL}/#jobs" style="display:inline-block;background:${GOLD};color:${INK};${FONT}font-size:15px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:8px;margin-bottom:8px;">
+      Browse Writing Jobs →
+    </a>
   `);
-  return sendEmail({ to: user.email, subject: 'Welcome to PenHire – Start earning in dollars', html });
+
+  await sendEmail({ to: user.email, subject: `Welcome to PenHire, ${user.name.split(' ')[0]}! ✒`, html });
 }
 
-// ── JOB UNLOCKED EMAIL ──
+// ── JOB UNLOCKED EMAIL ── (the main one)
 async function sendJobUnlocked(user, job) {
+  const jobDetailUrl = `${BASE_URL}/job/${job.uuid}`;
+  const applyUrl     = job.apply_url || job.source_url || '';
+  const applyEmail   = job.apply_email || '';
+  const payRange     = job.pay_max
+    ? `$${job.pay_min || 0} – $${job.pay_max} ${job.pay_type || 'per project'}`
+    : `$${job.pay_min || 0} ${job.pay_type || 'per project'}`;
+
+  // Format description — strip any HTML, wrap in paragraphs
+  const rawDesc    = (job.description || '').replace(/<[^>]*>/g, '').trim();
+  const descParas  = rawDesc.split(/\n{2,}/).filter(Boolean).map(p =>
+    `<p style="margin:0 0 12px;${FONT}font-size:14px;color:#333;line-height:1.7;">${p.replace(/\n/g, '<br>')}</p>`
+  ).join('');
+
+  const rawReqs    = (job.requirements || '').replace(/<[^>]*>/g, '').trim();
+  const reqParas   = rawReqs ? rawReqs.split(/\n{2,}/).filter(Boolean).map(p =>
+    `<p style="margin:0 0 12px;${FONT}font-size:14px;color:#333;line-height:1.7;">${p.replace(/\n/g, '<br>')}</p>`
+  ).join('') : '<p style="margin:0;font-size:14px;color:#999;">No specific requirements listed.</p>';
+
+  // Tags
+  let tagsHtml = '';
+  try {
+    const tags = JSON.parse(job.tags || '[]');
+    if (tags.length) {
+      tagsHtml = tags.map(t =>
+        `<span style="display:inline-block;background:#ede9e0;color:${MUTED};${FONT}font-size:12px;font-weight:500;padding:4px 12px;border-radius:100px;margin:0 6px 6px 0;">${t}</span>`
+      ).join('');
+    }
+  } catch {}
+
   const html = baseTemplate(`
-    <h2>Job Unlocked! 🔓</h2>
-    <p>You've successfully unlocked a job. Here are the full details:</p>
-    <div class="highlight">
-      <strong>${job.title}</strong><br>
-      <span style="font-family:Arial;font-size:14px;color:#555;">
-        🏢 ${job.company} · ${job.country}<br>
-        💰 $${job.pay_min}–$${job.pay_max} ${job.pay_type}<br>
-        📧 Apply to: <strong>${job.apply_email}</strong>
-      </span>
+    <!-- SUCCESS BANNER -->
+    <div style="background:linear-gradient(135deg,${INK},#2a2820);border-radius:12px;padding:28px 32px;margin-bottom:32px;position:relative;overflow:hidden;">
+      <p style="margin:0 0 6px;${FONT}font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${GOLD};">Job Unlocked</p>
+      <h1 style="margin:0 0 8px;${FONT}font-size:22px;font-weight:900;color:${PAPER};line-height:1.2;">${job.title}</h1>
+      <p style="margin:0;${FONT}font-size:14px;color:rgba(247,244,239,0.6);">${job.company || 'Remote Employer'} · ${job.country || 'Remote'}</p>
     </div>
-    <h3 style="color:${DARK};font-size:17px;">Full Job Description</h3>
-    <p>${job.description}</p>
-    ${job.requirements ? `<h3 style="color:${DARK};font-size:17px;">Requirements</h3><p>${job.requirements}</p>` : ''}
-    <div class="highlight">
-      <strong>How to apply:</strong><br>
-      <span style="font-family:Arial;font-size:14px;color:#555;">
-        Send your application, writing samples, and rate to:<br>
-        <strong>${job.apply_email}</strong><br><br>
-        ${job.apply_url ? `Or apply online: <a href="${job.apply_url}">${job.apply_url}</a>` : ''}
-      </span>
+
+    <p style="margin:0 0 28px;${FONT}font-size:15px;color:${MUTED};line-height:1.6;">
+      Hi ${user.name.split(' ')[0]}, you've unlocked full access to this job. Here's everything you need to apply — good luck! 🎉
+    </p>
+
+    <!-- KEY DETAILS STRIP -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+      <tr>
+        <td width="33%" style="background:${PAPER};border-radius:10px;padding:16px;text-align:center;">
+          <p style="margin:0 0 4px;${FONT}font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">Pay</p>
+          <p style="margin:0;${FONT}font-size:16px;font-weight:900;color:${SAGE};">${payRange}</p>
+        </td>
+        <td width="2%"></td>
+        <td width="33%" style="background:${PAPER};border-radius:10px;padding:16px;text-align:center;">
+          <p style="margin:0 0 4px;${FONT}font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">Type</p>
+          <p style="margin:0;${FONT}font-size:16px;font-weight:900;color:${INK};">${job.category || 'Writing'}</p>
+        </td>
+        <td width="2%"></td>
+        <td width="30%" style="background:${PAPER};border-radius:10px;padding:16px;text-align:center;">
+          <p style="margin:0 0 4px;${FONT}font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${MUTED};">Location</p>
+          <p style="margin:0;${FONT}font-size:16px;font-weight:900;color:${INK};">${job.country || 'Remote'}</p>
+        </td>
+      </tr>
+    </table>
+
+    ${tagsHtml ? `<div style="margin-bottom:28px;">${tagsHtml}</div>` : ''}
+
+    <!-- DESCRIPTION -->
+    <p style="margin:0 0 12px;${FONT}font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${GOLD};">Job Description</p>
+    <div style="margin-bottom:28px;">
+      ${descParas || `<p style="margin:0;${FONT}font-size:14px;color:${MUTED};">See full details on PenHire.</p>`}
     </div>
-    <p style="font-size:13px;color:#aaa;">Good luck! Most applications are reviewed within 48 hours.</p>
+
+    <!-- REQUIREMENTS -->
+    <p style="margin:0 0 12px;${FONT}font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${GOLD};">Requirements</p>
+    <div style="margin-bottom:32px;">
+      ${reqParas}
+    </div>
+
+    <!-- HOW TO APPLY -->
+    <div style="background:#f0f9f0;border:1px solid rgba(74,103,65,0.2);border-radius:12px;padding:24px;margin-bottom:32px;">
+      <p style="margin:0 0 12px;${FONT}font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:${SAGE};">How to Apply</p>
+      ${applyEmail ? `<p style="margin:0 0 8px;${FONT}font-size:14px;color:${INK};">📧 <strong>Email:</strong> <a href="mailto:${applyEmail}" style="color:${SAGE};text-decoration:none;">${applyEmail}</a></p>` : ''}
+      ${applyUrl   ? `<p style="margin:0 0 16px;${FONT}font-size:14px;color:${INK};">🔗 <strong>Apply Link:</strong> <a href="${applyUrl}" style="color:${SAGE};text-decoration:none;word-break:break-all;">${applyUrl}</a></p>` : ''}
+      ${applyUrl ? `
+      <a href="${applyUrl}" style="display:inline-block;background:${SAGE};color:#fff;${FONT}font-size:14px;font-weight:700;text-decoration:none;padding:12px 28px;border-radius:8px;">
+        Apply on Original Posting →
+      </a>` : ''}
+    </div>
+
+    <!-- VIEW ON PENHIRE -->
+    <div style="border-top:1px solid #ede9e0;padding-top:24px;text-align:center;">
+      <p style="margin:0 0 16px;${FONT}font-size:13px;color:${MUTED};">View the full job page on PenHire anytime:</p>
+      <a href="${jobDetailUrl}" style="display:inline-block;background:${INK};color:${PAPER};${FONT}font-size:14px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:8px;">
+        View Full Job on PenHire →
+      </a>
+      <p style="margin:16px 0 0;${FONT}font-size:12px;color:#ccc;">
+        This link is exclusive to your account. Please do not share it.
+      </p>
+    </div>
   `);
-  return sendEmail({ to: user.email, subject: `Job Unlocked: ${job.title}`, html });
+
+  await sendEmail({
+    to:      user.email,
+    subject: `🔓 Job Unlocked: ${job.title} — Full Details Inside`,
+    html,
+  });
 }
 
-// ── JOB POSTED EMAIL (Employer) ──
+// ── JOB POSTED (employer confirmation) ──
 async function sendJobPosted(employer, job) {
   const html = baseTemplate(`
-    <h2>Your Job is Live! 🎉</h2>
-    <p>Your job posting is now live on PenHire and visible to 800+ Kenyan writers.</p>
-    <div class="highlight">
-      <strong>${job.title}</strong><br>
-      <span style="font-family:Arial;font-size:14px;color:#555;">
-        💰 Budget: $${job.pay_min}–$${job.pay_max}<br>
-        📧 Applications sent to: ${employer.email}<br>
-        ⏰ Expires: 30 days from today
-      </span>
-    </div>
-    <p>Writers will apply directly to your email address. You can expect your first applications within a few hours.</p>
-    <p style="font-size:13px;color:#aaa;">Need to edit or remove your listing? Reply to this email.</p>
+    <h1 style="margin:0 0 8px;${FONT}font-size:24px;font-weight:900;color:${INK};">Your job is now live! 🎉</h1>
+    <p style="margin:0 0 28px;${FONT}font-size:15px;color:${MUTED};line-height:1.6;">
+      Writers can now see and unlock your job listing on PenHire.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:${PAPER};border-radius:12px;padding:24px;margin-bottom:28px;">
+      <tr>
+        <td>
+          <p style="margin:0 0 6px;${FONT}font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${GOLD};">Job Details</p>
+          <p style="margin:0 0 4px;${FONT}font-size:14px;color:${INK};"><strong>Title:</strong> ${job.title}</p>
+          <p style="margin:0 0 4px;${FONT}font-size:14px;color:${INK};"><strong>Category:</strong> ${job.category || 'Writing'}</p>
+          <p style="margin:0;${FONT}font-size:14px;color:${INK};"><strong>Applications to:</strong> ${job.apply_email || 'N/A'}</p>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 24px;${FONT}font-size:14px;color:${MUTED};line-height:1.7;">
+      You'll receive applications directly to your email from writers who unlock your job. The listing is live for 30 days.
+    </p>
+    <a href="${BASE_URL}" style="display:inline-block;background:${GOLD};color:${INK};${FONT}font-size:15px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:8px;">
+      Visit PenHire →
+    </a>
   `);
-  return sendEmail({ to: employer.email, subject: `Job Posted: ${job.title} is now live on PenHire`, html });
+
+  await sendEmail({ to: employer.email, subject: `Your job is live on PenHire: ${job.title}`, html });
 }
 
-// ── NEW JOB ALERT (to all writers in category) ──
-async function sendNewJobAlert(writers, job) {
-  for (const writer of writers) {
-    const html = baseTemplate(`
-      <h2>New Job: ${job.title} 🆕</h2>
-      <p>A new job matching your speciality was just posted.</p>
-      <div class="highlight">
-        <strong>${job.title}</strong><br>
-        <span style="font-family:Arial;font-size:14px;color:#555;">
-          🏢 ${job.company} · ${job.country}<br>
-          💰 $${job.pay_min}–$${job.pay_max} ${job.pay_type}<br>
-          🔓 Unlock fee: KES ${job.unlock_kes}
-        </span>
-      </div>
-      <a href="${process.env.BASE_URL}/jobs/${job.uuid}" class="btn">View & Unlock Job →</a>
-      <p style="font-size:12px;color:#aaa;margin-top:20px;">
-        You're receiving this because you registered as a ${job.category} writer.
-        <a href="${process.env.BASE_URL}/unsubscribe?email=${writer.email}" style="color:#aaa;">Unsubscribe</a>
-      </p>
-    `);
-    await sendEmail({ to: writer.email, subject: `New ${job.category} job: ${job.title} – KES ${job.unlock_kes} to unlock`, html });
-    // Small delay to avoid spam throttling
-    await new Promise(r => setTimeout(r, 200));
-  }
-}
-
-// ── ADMIN NEW JOB ALERT ──
-async function sendAdminNewJob(job) {
-  const html = baseTemplate(`
-    <h2>New Job Posted 📋</h2>
-    <div class="highlight">
-      <strong>${job.title}</strong><br>
-      <span style="font-family:Arial;font-size:14px;color:#555;">
-        Source: ${job.source}<br>
-        Category: ${job.category}<br>
-        Pay: $${job.pay_min}–$${job.pay_max}<br>
-        Company: ${job.company}
-      </span>
-    </div>
-    <a href="${process.env.BASE_URL}/admin/jobs" class="btn">View in Admin →</a>
-  `);
-  return sendEmail({ to: process.env.ADMIN_EMAIL, subject: `New job posted: ${job.title}`, html });
-}
-
-module.exports = {
-  sendWelcome,
-  sendJobUnlocked,
-  sendJobPosted,
-  sendNewJobAlert,
-  sendAdminNewJob,
-  sendEmail
-};
+module.exports = { sendEmail, sendWelcome, sendJobUnlocked, sendJobPosted };
