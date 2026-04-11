@@ -1585,12 +1585,12 @@
     <div id="loginTab" class="tab-content">
       <div class="form-group">
         <label>Email Address</label>
-        <input type="email" id="loginEmail" placeholder="your@email.com">
+        <input type="email" id="loginEmail" placeholder="your@email.com" onkeydown="if(event.key==='Enter') handleLogin()">
       </div>
       <div class="form-group">
         <label>Password</label>
         <div class="password-wrap">
-          <input type="password" id="loginPassword" placeholder="Your password">
+          <input type="password" id="loginPassword" placeholder="Your password" onkeydown="if(event.key==='Enter') handleLogin()">
           <button type="button" class="eye-btn" onclick="togglePassword('loginPassword', this)" title="Show/hide password">👁</button>
         </div>
       </div>
@@ -1647,7 +1647,7 @@
         Enter your M-Pesa number and click pay. You'll receive a prompt on your phone to confirm the payment. Job unlocks automatically within seconds.
       </p>
       <div class="form-group" style="margin-top:12px; margin-bottom:0">
-        <input type="tel" id="mpesaPhone" placeholder="07XX XXX XXX" style="background:white;">
+        <input type="tel" id="mpesaPhone" placeholder="07XX XXX XXX" style="background:white;" onkeydown="if(event.key==='Enter') processUnlock()">
       </div>
     </div>
 
@@ -1966,7 +1966,7 @@
     <p class="sub" style="margin-bottom:28px;">Enter your email and we'll send a reset link.</p>
     <div class="form-group">
       <label>Email Address</label>
-      <input type="email" id="forgotEmail" placeholder="your@email.com">
+      <input type="email" id="forgotEmail" placeholder="your@email.com" onkeydown="if(event.key==='Enter') submitForgotPassword()">
     </div>
     <div id="forgotMsg" style="font-size:0.82rem; margin-bottom:8px; display:none;"></div>
     <button class="form-submit" id="forgotBtn" onclick="submitForgotPassword()">Send Reset Link →</button>
@@ -2062,8 +2062,14 @@ function renderJobs(list) {
         🔓 Unlock <span class="unlock-cost">${job.unlockFee}</span>
       </button>`;
     }
+    const cardClick = (existing && existing.status === 'pending_approval')
+      ? `onclick="showToast('⏳ Awaiting admin approval — check My Jobs', 'success')"`
+      : (existing && existing.status === 'unlocked' && existing.jobLink)
+        ? `onclick="window.open('${existing.jobLink}','_blank')"`
+        : `onclick="openUnlock(${job.id})"`;
+
     return `
-    <div class="job-card ${existing ? '' : 'locked'}" onclick="openUnlock(${job.id})">
+    <div class="job-card ${existing ? '' : 'locked'}" ${cardClick}>
       <div class="job-logo">${job.icon}</div>
       <div class="job-info">
         <div class="job-title">${job.title}</div>
@@ -3029,6 +3035,18 @@ function toggleTheme() {
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   applyTheme(saved === 'dark' || (!saved && prefersDark));
 })();
+
+// ── ESCAPE KEY — close any open modal or profile ──
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  // Close profile panel first if open
+  if (document.getElementById('profileOverlay').classList.contains('open')) {
+    closeProfile(); return;
+  }
+  // Close any open modal overlay
+  const openModal = document.querySelector('.modal-overlay.open');
+  if (openModal) openModal.classList.remove('open');
+});
 
 // ── INIT ──
 renderJobs(jobs);
