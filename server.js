@@ -316,7 +316,7 @@ async function start() {
   });
 
   // Cron: scrape every 2 hours
-  cron.schedule('0 */2 * * *', () => {
+  cron.schedule('*/30 * * * *', () => {
     console.log('⏰ Scheduled scrape starting...');
     runAllScrapers().catch(console.error);
   });
@@ -331,7 +331,7 @@ async function start() {
   setTimeout(() => {
     console.log('🔍 Running initial scrape...');
     runAllScrapers().catch(console.error);
-  }, 30000);
+  }, 10000);
 }
 
 start().catch(console.error);
