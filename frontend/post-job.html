@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Post a Writing Job – PenHire</title>
+<meta name="description" content="Post a writing job on PenHire and reach 800+ skilled Kenyan writers. Jobs go live instantly after payment.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0f0e0c; --paper: #f7f4ef; --cream: #ede9e0;
+    --gold: #c9a84c; --gold-light: #e8c96a; --rust: #b84c2a;
+    --sage: #4a6741; --muted: #8a8478; --white: #ffffff;
+    --shadow: 0 4px 24px rgba(15,14,12,0.10);
+    --shadow-lg: 0 12px 48px rgba(15,14,12,0.16);
+  }
+  html.dark {
+    --ink: #ede9df; --paper: #0e0d0b; --cream: #1c1a16;
+    --white: #181512; --muted: #9a9590;
+    --shadow: 0 4px 24px rgba(0,0,0,0.45);
+  }
+  html.dark nav { background: rgba(14,13,11,0.97) !important; }
+  html.dark .form-card { background: var(--white); }
+  html.dark .form-group input, html.dark .form-group select, html.dark .form-group textarea { background: var(--cream); border-color: rgba(255,255,255,0.1); color: var(--ink); }
+  html.dark .form-group label { color: var(--ink); }
+  html.dark .price-preview { background: var(--cream); }
+  html.dark .benefit-card { background: var(--white); border-color: rgba(255,255,255,0.06); }
+  html.dark footer { background: #070605; }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); }
+  h1,h2,h3,h4 { font-family: 'Playfair Display', serif; }
+
+  /* ── NAV ── */
+  nav { position: sticky; top: 0; z-index: 100; background: rgba(247,244,239,0.97); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(201,168,76,0.25); padding: 0 5%; display: flex; align-items: center; justify-content: space-between; height: 68px; }
+  .nav-logo { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 900; color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+  .nav-logo span { color: var(--gold); }
+  .nav-links { display: flex; align-items: center; gap: 28px; }
+  .nav-links a { text-decoration: none; color: var(--muted); font-size: 0.88rem; font-weight: 500; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--ink); }
+  .nav-links a.active { color: var(--gold); font-weight: 700; }
+  .nav-cta { background: var(--ink) !important; color: var(--paper) !important; padding: 10px 20px; border-radius: 6px; font-weight: 600 !important; font-size: 0.85rem !important; }
+  .nav-cta:hover { background: var(--gold) !important; color: var(--ink) !important; }
+  .theme-toggle { width: 42px; height: 24px; background: var(--cream); border: 1.5px solid rgba(15,14,12,0.12); border-radius: 100px; position: relative; cursor: pointer; transition: background 0.3s; flex-shrink: 0; outline: none; display: flex; align-items: center; padding: 0 3px; }
+  html.dark .theme-toggle { background: rgba(201,168,76,0.2); border-color: rgba(201,168,76,0.3); }
+  .toggle-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 0.6rem; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); user-select: none; pointer-events: none; }
+  html.dark .toggle-thumb { transform: translateX(18px); }
+
+  /* ── HEADER ── */
+  .page-header { background: var(--sage); padding: 60px 5%; position: relative; overflow: hidden; }
+  .page-header::before { content: ''; position: absolute; top: -80px; right: -80px; width: 400px; height: 400px; border-radius: 50%; background: rgba(255,255,255,0.05); }
+  .page-header h1 { font-size: clamp(2rem, 4vw, 3rem); color: var(--white); margin-bottom: 12px; position: relative; z-index: 1; }
+  .page-header p { color: rgba(255,255,255,0.65); font-size: 1rem; line-height: 1.6; max-width: 520px; position: relative; z-index: 1; }
+
+  /* ── MAIN LAYOUT ── */
+  .post-layout { display: grid; grid-template-columns: 1fr 420px; gap: 48px; max-width: 1100px; margin: 0 auto; padding: 60px 5%; align-items: start; }
+
+  /* ── FORM CARD ── */
+  .form-card { background: var(--white); border-radius: 20px; padding: 48px 40px; box-shadow: var(--shadow-lg); }
+  .form-card h2 { font-size: 1.8rem; margin-bottom: 8px; }
+  .form-card .sub { color: var(--muted); font-size: 0.88rem; margin-bottom: 36px; }
+  .form-group { margin-bottom: 22px; }
+  .form-group label { display: block; font-size: 0.82rem; font-weight: 700; margin-bottom: 8px; color: var(--ink); letter-spacing: 0.02em; }
+  .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 13px 16px; border: 1.5px solid rgba(15,14,12,0.12); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; background: var(--paper); transition: border-color 0.2s; color: var(--ink); outline: none; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--gold); }
+  .form-group textarea { min-height: 120px; resize: vertical; }
+  .form-group .hint { font-size: 0.75rem; color: var(--muted); margin-top: 6px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* ── PRICE PREVIEW ── */
+  .price-preview { background: var(--cream); border-radius: 12px; padding: 20px 24px; margin: 8px 0 24px; display: none; }
+  .price-preview.show { display: flex; justify-content: space-between; align-items: center; }
+  .price-label { font-size: 0.85rem; color: var(--muted); }
+  .price-label strong { display: block; font-size: 1rem; color: var(--ink); margin-bottom: 2px; }
+  .price-amount { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; color: var(--gold); }
+
+  /* ── SUBMIT BTN ── */
+  .submit-btn { width: 100%; padding: 18px; background: var(--gold); color: var(--ink); border: none; border-radius: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 800; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  .submit-btn:hover { background: var(--gold-light); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(201,168,76,0.3); }
+  .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+  .submit-note { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 12px; }
+
+  /* ── SIDEBAR INFO ── */
+  .sidebar-info { display: flex; flex-direction: column; gap: 20px; }
+  .benefit-card { background: var(--white); border: 1px solid rgba(15,14,12,0.08); border-radius: 16px; padding: 24px; }
+  .benefit-icon { font-size: 1.8rem; margin-bottom: 12px; }
+  .benefit-title { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+  .benefit-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.6; }
+  .pricing-table { background: var(--ink); border-radius: 16px; padding: 28px; }
+  .pricing-table h3 { color: var(--paper); font-size: 1.1rem; margin-bottom: 20px; }
+  .pricing-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(247,244,239,0.08); }
+  .pricing-row:last-child { border: none; }
+  .pricing-row .range { font-size: 0.82rem; color: rgba(247,244,239,0.55); }
+  .pricing-row .fee { font-family: 'Playfair Display', serif; font-weight: 700; color: var(--gold); }
+  .writers-stat { background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.25); border-radius: 16px; padding: 24px; text-align: center; }
+  .writers-stat .num { font-family: 'Playfair Display', serif; font-size: 3rem; font-weight: 900; color: var(--gold); }
+  .writers-stat p { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+
+  /* ── SUCCESS STATE ── */
+  .success-state { text-align: center; padding: 20px 0; display: none; }
+  .success-icon { font-size: 4rem; margin-bottom: 16px; }
+  .success-state h3 { font-size: 1.6rem; margin-bottom: 10px; }
+  .success-state p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 24px; }
+
+  /* ── TOAST ── */
+  .toast { position: fixed; bottom: 32px; right: 32px; background: var(--ink); color: var(--paper); padding: 16px 24px; border-radius: 12px; font-size: 0.88rem; font-weight: 500; box-shadow: var(--shadow-lg); transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 3000; display: flex; align-items: center; gap: 10px; max-width: 320px; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-left: 4px solid var(--gold); }
+  .toast.error { border-left: 4px solid var(--rust); }
+
+  /* ── FOOTER ── */
+  footer { background: var(--ink); padding: 40px 5%; color: rgba(247,244,239,0.5); text-align: center; font-size: 0.82rem; }
+  footer a { color: var(--gold); text-decoration: none; }
+
+  /* ── FLOATING THEME ── */
+  .floating-theme-btn { position: fixed; bottom: 28px; right: 20px; z-index: 1200; width: 44px; height: 44px; border-radius: 50%; background: var(--ink); color: var(--paper); border: 2px solid rgba(201,168,76,0.35); box-shadow: 0 4px 16px rgba(0,0,0,0.25); cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; transition: all 0.25s; }
+  .floating-theme-btn:hover { background: var(--gold); color: var(--ink); transform: scale(1.1); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .post-layout { grid-template-columns: 1fr; padding: 32px 5%; }
+    .form-card { padding: 32px 24px; }
+    .nav-links { display: none; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">✒ Pen<span>Hire</span></a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/jobs">Browse Jobs</a>
+    <a href="/#how-it-works">How It Works</a>
+    <a href="/#pricing">Pricing</a>
+    <a href="/post-job" class="active">Post a Job</a>
+    <button class="theme-toggle" onclick="toggleTheme()"><span class="toggle-thumb">☀️</span></button>
+    <a href="/jobs" class="nav-cta">Browse Jobs →</a>
+  </div>
+</nav>
+
+<!-- HEADER -->
+<div class="page-header">
+  <h1>Post a Writing Job</h1>
+  <p>Reach 800+ skilled Kenyan writers. Pay a small posting fee — your job goes live instantly. Serious, committed applications arrive within hours.</p>
+</div>
+
+<!-- MAIN -->
+<div class="post-layout">
+
+  <!-- FORM -->
+  <div class="form-card" id="formCard">
+    <h2>Job Details</h2>
+    <p class="sub">Fill in the details below. Your job goes live immediately after PayPal payment.</p>
+
+    <!-- SUCCESS STATE -->
+    <div class="success-state" id="successState">
+      <div class="success-icon">🎉</div>
+      <h3>Job Posted Successfully!</h3>
+      <p>Your job is now live on PenHire and visible to 800+ writers. You'll start receiving applications directly to your email within hours.</p>
+      <a href="/jobs" style="display:inline-flex;align-items:center;gap:8px;background:var(--gold);color:var(--ink);padding:14px 28px;border-radius:8px;font-weight:700;text-decoration:none;">🔍 Browse All Jobs →</a>
+      <br><br>
+      <button onclick="resetForm()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.88rem;text-decoration:underline;">Post Another Job</button>
+    </div>
+
+    <!-- FORM FIELDS -->
+    <div id="formFields">
+      <div class="form-group">
+        <label>Job Title *</label>
+        <input type="text" id="jobTitle" placeholder="e.g. Blog Writer for Health & Wellness Site" maxlength="200">
+        <div class="hint">Be specific — better titles get more applications</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Category *</label>
+          <select id="jobCategory">
+            <option value="">Select category...</option>
+            <option value="blog">Blog Writing</option>
+            <option value="copywriting">Copywriting</option>
+            <option value="technical">Technical Writing</option>
+            <option value="academic">Academic Writing</option>
+            <option value="social">Social Media Content</option>
+            <option value="blog">SEO Content</option>
+            <option value="blog">Ghostwriting</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Job Budget *</label>
+          <select id="jobBudget" onchange="updatePricePreview()">
+            <option value="">Select budget range...</option>
+            <option value="3" data-label="Below $10">Below $10 per piece</option>
+            <option value="5" data-label="$10–$30">$10–$30 per piece</option>
+            <option value="10" data-label="$30–$100">$30–$100 per piece</option>
+            <option value="20" data-label="$100–$500">$100–$500 per project</option>
+            <option value="40" data-label="$500+">$500+ per project</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Job Description *</label>
+        <textarea id="jobDescription" placeholder="Describe the writing task in detail:&#10;• What type of content do you need?&#10;• Word count or volume&#10;• Tone and style&#10;• Topic or niche&#10;• Deadline&#10;• Any special requirements"></textarea>
+        <div class="hint">The more detail you provide, the better your applicants will be</div>
+      </div>
+
+      <div class="form-group">
+        <label>Requirements</label>
+        <textarea id="jobRequirements" placeholder="e.g. Native English speaker preferred, 2+ years experience, SEO knowledge required..." style="min-height:80px;"></textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Your Name / Company *</label>
+          <input type="text" id="employerName" placeholder="Your name or company">
+        </div>
+        <div class="form-group">
+          <label>Email for Applications *</label>
+          <input type="email" id="employerEmail" placeholder="Applications sent here">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Apply Link (optional)</label>
+        <input type="url" id="applyUrl" placeholder="https://yoursite.com/apply or job board URL">
+        <div class="hint">If you have an online application form or job board listing</div>
+      </div>
+
+      <!-- PRICE PREVIEW -->
+      <div class="price-preview" id="pricePreview">
+        <div class="price-label">
+          <strong id="priceRangeLabel">Job Budget</strong>
+          Posting fee — one-time, no hidden costs
+        </div>
+        <div class="price-amount" id="priceAmount">$5</div>
+      </div>
+
+      <div id="formError" style="background:rgba(184,76,42,0.08);border:1px solid rgba(184,76,42,0.2);border-radius:8px;padding:12px 16px;font-size:0.85rem;color:var(--rust);margin-bottom:16px;display:none;"></div>
+
+      <button class="submit-btn" id="submitBtn" onclick="handleSubmit()">
+        📋 Post Job & Pay with PayPal →
+      </button>
+      <div class="submit-note">🔒 Secure PayPal checkout · Job live within 60 seconds of payment</div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar-info">
+
+    <div class="writers-stat">
+      <div class="num" id="writerCount">800+</div>
+      <p>Active Kenyan writers ready to apply</p>
+    </div>
+
+    <div class="benefit-card">
+      <div class="benefit-icon">⚡</div>
+      <div class="benefit-title">Applications in Hours</div>
+      <div class="benefit-desc">Your job is instantly visible to all writers on the platform. Expect your first applications within 2–4 hours of posting.</div>
+    </div>
+
+    <div class="benefit-card">
+      <div class="benefit-icon">✅</div>
+      <div class="benefit-title">Serious Applicants Only</div>
+      <div class="benefit-desc">Writers pay a small fee to unlock your job details. This filters out casual browsers — only genuinely interested writers apply.</div>
+    </div>
+
+    <div class="benefit-card">
+      <div class="benefit-icon">💰</div>
+      <div class="benefit-title">Competitive Rates</div>
+      <div class="benefit-desc">Kenya produces world-class English writers at rates significantly lower than US/UK markets, without sacrificing quality.</div>
+    </div>
+
+    <div class="pricing-table">
+      <h3>Posting Fees</h3>
+      <div class="pricing-row"><span class="range">Below $10 per piece</span><span class="fee">$3</span></div>
+      <div class="pricing-row"><span class="range">$10–$30 per piece</span><span class="fee">$5</span></div>
+      <div class="pricing-row"><span class="range">$30–$100 per piece</span><span class="fee">$10</span></div>
+      <div class="pricing-row"><span class="range">$100–$500 per project</span><span class="fee">$20</span></div>
+      <div class="pricing-row"><span class="range">$500+ per project</span><span class="fee">$40</span></div>
+      <p style="color:rgba(247,244,239,0.4);font-size:0.75rem;margin-top:12px;">One-time fee. Job stays live 30 days.</p>
+    </div>
+
+    <div class="benefit-card" style="background:var(--cream);">
+      <div class="benefit-icon">📬</div>
+      <div class="benefit-title">Applications Go to Your Inbox</div>
+      <div class="benefit-desc">Writers apply directly to your email — no platform middleman, no extra commission, no per-hire fees.</div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2026 PenHire — <a href="/">Home</a> · <a href="/jobs">Browse Jobs</a> · <a href="/admin">Admin</a></p>
+</footer>
+
+<!-- FLOATING THEME -->
+<button class="floating-theme-btn" id="floatingThemeBtn" onclick="toggleTheme()">🌙</button>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD" data-namespace="paypal_sdk"></script>
+<script>
+// ── THEME ──
+function applyTheme(dark) {
+  document.documentElement.classList.toggle('dark', dark);
+  document.querySelectorAll('.toggle-thumb').forEach(el => el.textContent = dark ? '🌙' : '☀️');
+  const fb = document.getElementById('floatingThemeBtn');
+  if (fb) fb.textContent = dark ? '☀️' : '🌙';
+}
+function toggleTheme() {
+  const isDark = document.documentElement.classList.contains('dark');
+  applyTheme(!isDark); localStorage.setItem('ph_theme', !isDark ? 'dark' : 'light');
+}
+(function() {
+  const saved = localStorage.getItem('ph_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved === 'dark' || (!saved && prefersDark));
+})();
+
+// ── PRICE PREVIEW ──
+function updatePricePreview() {
+  const sel = document.getElementById('jobBudget');
+  const opt = sel.options[sel.selectedIndex];
+  const preview = document.getElementById('pricePreview');
+  const amount  = document.getElementById('priceAmount');
+  const label   = document.getElementById('priceRangeLabel');
+  if (sel.value) {
+    preview.classList.add('show');
+    amount.textContent = '$' + sel.value;
+    label.textContent  = opt.dataset.label || 'Job Budget';
+  } else {
+    preview.classList.remove('show');
+  }
+}
+
+// ── VALIDATE ──
+function validate() {
+  const title   = document.getElementById('jobTitle').value.trim();
+  const cat     = document.getElementById('jobCategory').value;
+  const budget  = document.getElementById('jobBudget').value;
+  const desc    = document.getElementById('jobDescription').value.trim();
+  const email   = document.getElementById('employerEmail').value.trim();
+  const name    = document.getElementById('employerName').value.trim();
+
+  if (!title)  return 'Job title is required.';
+  if (!cat)    return 'Please select a category.';
+  if (!budget) return 'Please select a budget range.';
+  if (desc.length < 50) return 'Please write a more detailed job description (at least 50 characters).';
+  if (!email || !email.includes('@')) return 'Please enter a valid email address.';
+  if (!name)   return 'Please enter your name or company name.';
+  return null;
+}
+
+// ── COLLECT FORM DATA ──
+function getFormData() {
+  return {
+    title:        document.getElementById('jobTitle').value.trim(),
+    category:     document.getElementById('jobCategory').value,
+    budget:       document.getElementById('jobBudget').value,
+    description:  document.getElementById('jobDescription').value.trim(),
+    requirements: document.getElementById('jobRequirements').value.trim(),
+    employerName: document.getElementById('employerName').value.trim(),
+    applyEmail:   document.getElementById('employerEmail').value.trim(),
+    applyUrl:     document.getElementById('applyUrl').value.trim(),
+  };
+}
+
+// ── HANDLE SUBMIT ──
+async function handleSubmit() {
+  const errEl = document.getElementById('formError');
+  errEl.style.display = 'none';
+
+  const error = validate();
+  if (error) { errEl.textContent = error; errEl.style.display = 'block'; return; }
+
+  const formData = getFormData();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Creating PayPal order...';
+
+  try {
+    const res = await fetch('/api/paypal/create-job-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData)
+    });
+    const data = await res.json();
+
+    if (data.approvalUrl) {
+      // Redirect to PayPal approval page
+      showToast('Redirecting to PayPal...', 'success');
+      setTimeout(() => { window.location.href = data.approvalUrl; }, 800);
+    } else {
+      errEl.textContent = data.error || 'Could not create PayPal order. Try again.';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = '📋 Post Job & Pay with PayPal →';
+    }
+  } catch (err) {
+    errEl.textContent = 'Connection error. Please try again.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '📋 Post Job & Pay with PayPal →';
+  }
+}
+
+// ── RESET FORM ──
+function resetForm() {
+  document.getElementById('successState').style.display = 'none';
+  document.getElementById('formFields').style.display = 'block';
+  document.getElementById('jobTitle').value = '';
+  document.getElementById('jobCategory').value = '';
+  document.getElementById('jobBudget').value = '';
+  document.getElementById('jobDescription').value = '';
+  document.getElementById('jobRequirements').value = '';
+  document.getElementById('employerName').value = '';
+  document.getElementById('employerEmail').value = '';
+  document.getElementById('applyUrl').value = '';
+  document.getElementById('pricePreview').classList.remove('show');
+  document.getElementById('submitBtn').disabled = false;
+  document.getElementById('submitBtn').textContent = '📋 Post Job & Pay with PayPal →';
+}
+
+// ── CHECK IF RETURNING FROM PAYPAL ──
+async function checkPayPalReturn() {
+  const params = new URLSearchParams(window.location.search);
+  const orderId = params.get('token');
+  const status = window.location.pathname;
+
+  if (orderId && window.location.href.includes('/payment/success')) {
+    // Capture the payment
+    try {
+      const res = await fetch(`/api/paypal/capture/${orderId}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('formFields').style.display = 'none';
+        document.getElementById('successState').style.display = 'block';
+        showToast('🎉 Job posted successfully!', 'success');
+        window.history.replaceState({}, '', '/post-job');
+      }
+    } catch(e) {}
+  }
+}
+
+// ── LOAD WRITER COUNT ──
+async function loadWriterCount() {
+  try {
+    const res = await fetch('/api/health');
+    const data = await res.json();
+    if (data.jobs) {
+      document.getElementById('writerCount').textContent = data.jobs.toLocaleString() + '+';
+    }
+  } catch(e) {}
+}
+
+// ── TOAST ──
+function showToast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = (type==='success'?'✓ ':'✕ ') + msg;
+  el.className = 'toast ' + type + ' show';
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+// ── INIT ──
+checkPayPalReturn();
+loadWriterCount();
+</script>
+</body>
+</html>

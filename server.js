@@ -100,22 +100,33 @@ app.post('/api/auth/admin', (req, res) => {
 // JOBS ROUTES
 // ══════════════════════════════════════════
 app.get('/api/jobs', (req, res) => {
-  const { category, search, page = 1, limit = 20 } = req.query;
+  const { category, search, page = 1, limit = 20, source, sort } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(limit);
   let where = 'WHERE is_active = 1';
   const params = [];
-  if (category && category !== 'all') { where += ' AND category = ?'; params.push(category); }
-  if (search) { where += ' AND (title LIKE ? OR company LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
 
+  if (category && category !== 'all') { where += ' AND category = ?'; params.push(category); }
+  if (search) { where += ' AND (title LIKE ? OR company LIKE ? OR description LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
+  if (source && source !== 'all') {
+    if (source === 'employer') { where += ' AND source = "employer"'; }
+    else { where += ' AND source = ?'; params.push(source); }
+  }
+
+  const orderBy = sort === 'pay_high' ? 'pay_max DESC' :
+                  sort === 'pay_low'  ? 'unlock_kes ASC' :
+                  'is_featured DESC, created_at DESC';
+
+  const pageSize = Math.min(parseInt(limit) || 20, 50);
   const jobs = all(
     `SELECT id, uuid, title, company, country, category, pay_min, pay_max, pay_type,
      tags, unlock_kes, unlock_usd, source, views, unlocks, created_at, is_featured,
-     SUBSTR(description, 1, 150) || '...' as description_preview
-     FROM jobs ${where} ORDER BY is_featured DESC, created_at DESC LIMIT ? OFFSET ?`,
-    [...params, parseInt(limit), offset]
+     SUBSTR(description, 1, 180) || '...' as description_preview
+     FROM jobs ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
+    [...params, pageSize, offset]
   );
   const total = get(`SELECT COUNT(*) as c FROM jobs ${where}`, params);
-  res.json({ jobs, total: total?.c || 0, page: parseInt(page) });
+  const pages = Math.ceil((total?.c || 0) / pageSize);
+  res.json({ jobs, total: total?.c || 0, page: parseInt(page), pages });
 });
 
 app.get('/api/jobs/:uuid', (req, res) => {
@@ -299,6 +310,10 @@ app.delete('/api/admin/jobs/:id', adminRequired, (req, res) => {
 
 // ── SERVE FRONTEND ──
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'admin.html')));
+app.get('/jobs', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'jobs.html')));
+app.get('/post-job', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'post-job.html')));
+app.get('/payment/success', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'post-job.html')));
+app.get('/payment/cancel', (req, res) => res.redirect('/post-job'));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
 });
