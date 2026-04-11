@@ -2003,109 +2003,78 @@
 </div>
 
 <script>
-// ── JOB DATA ──
-const jobs = [
-  {
-    id: 1, icon: '🏥', title: 'Health & Wellness Blog Writer',
-    company: 'US Health Blog', location: 'Remote · USA',
-    pay: '$25 – $40/article', payValue: 40, category: 'blog',
-    tags: ['Health', 'Wellness', 'SEO'], type: 'Per Article',
-    unlockFee: 'KES 200', unlockUSD: '$2',
-    desc: 'Write 1,500-word health articles for a US wellness blog. Weekly assignments available.',
-    posted: '2 hours ago'
-  },
-  {
-    id: 2, icon: '💻', title: 'Technical Writer – SaaS Documentation',
-    company: 'UK Tech Startup', location: 'Remote · UK',
-    pay: '$150 – $300/project', payValue: 300, category: 'technical',
-    tags: ['Technical', 'SaaS', 'Docs'], type: 'Per Project',
-    unlockFee: 'KES 500', unlockUSD: '$4',
-    desc: 'Write user documentation and onboarding guides for a B2B SaaS platform.',
-    posted: '5 hours ago'
-  },
-  {
-    id: 3, icon: '📱', title: 'Social Media Copywriter',
-    company: 'AU eCommerce Brand', location: 'Remote · Australia',
-    pay: '$15 – $25/post', payValue: 25, category: 'social',
-    tags: ['Social Media', 'Copy', 'eCommerce'], type: 'Per Post',
-    unlockFee: 'KES 100', unlockUSD: '$1',
-    desc: 'Create engaging Instagram and Facebook captions for a growing Australian eCommerce brand.',
-    posted: '1 day ago'
-  },
-  {
-    id: 4, icon: '🎓', title: 'Academic Research Writer',
-    company: 'US Academic Platform', location: 'Remote · USA',
-    pay: '$40 – $80/paper', payValue: 80, category: 'academic',
-    tags: ['Academic', 'Research', 'APA'], type: 'Per Paper',
-    unlockFee: 'KES 200', unlockUSD: '$2',
-    desc: 'Write well-researched academic papers on various topics. Must have strong referencing skills.',
-    posted: '1 day ago'
-  },
-  {
-    id: 5, icon: '✈️', title: 'Travel Blog Content Writer',
-    company: 'UK Travel Blog', location: 'Remote · UK',
-    pay: '$20 – $35/article', payValue: 35, category: 'blog',
-    tags: ['Travel', 'Lifestyle', 'SEO'], type: 'Per Article',
-    unlockFee: 'KES 100', unlockUSD: '$1',
-    desc: 'Write vivid, SEO-optimised travel articles for a popular UK travel blog. Africa expertise a bonus.',
-    posted: '2 days ago'
-  },
-  {
-    id: 6, icon: '🛒', title: 'eCommerce Product Description Writer',
-    company: 'CA Online Store', location: 'Remote · Canada',
-    pay: '$5 – $12/product', payValue: 12, category: 'copywriting',
-    tags: ['eCommerce', 'Copy', 'Amazon'], type: 'Per Product',
-    unlockFee: 'KES 50', unlockUSD: '$0.50',
-    desc: 'Write compelling product descriptions for an Amazon store. Bulk assignments of 50–200 products.',
-    posted: '3 days ago'
-  }
-];
-
-let filteredJobs = [...jobs];
+// ── JOB DATA — loaded from API ──
+let jobs = [];
+let filteredJobs = [];
 let selectedJob = null;
 let selectedPayment = 'mpesa';
+
+// ── FETCH AND RENDER JOBS FROM API ──
+async function loadJobs(params = {}) {
+  const grid = document.getElementById('jobsGrid');
+  if (!grid) return;
+  grid.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--muted);">⏳ Loading jobs...</div>';
+
+  const query = new URLSearchParams({ limit: 12, ...params }).toString();
+  try {
+    const res = await fetch('/api/jobs?' + query);
+    const data = await res.json();
+    jobs = data.jobs || [];
+    filteredJobs = [...jobs];
+    renderJobs(filteredJobs);
+  } catch (e) {
+    grid.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--muted);">Could not load jobs. Check your connection.</div>';
+  }
+}
 
 // ── RENDER JOBS ──
 function renderJobs(list) {
   const grid = document.getElementById('jobsGrid');
+  if (!grid) return;
+  if (!list.length) {
+    grid.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--muted);">No jobs found. Try a different filter.</div>';
+    return;
+  }
   const unlockedJobs = JSON.parse(localStorage.getItem('ph_unlocked_jobs') || '[]');
 
   grid.innerHTML = list.map(job => {
-    const existing = unlockedJobs.find(j => j.id === job.id);
+    const jobId = job.uuid || job.id;
+    const existing = unlockedJobs.find(j => j.id === jobId);
     let btnHtml = '';
     if (existing && existing.status === 'pending_approval') {
       btnHtml = `<button class="unlock-btn" style="background:var(--rust);cursor:default;" disabled>🕐 Pending Approval</button>`;
     } else if (existing && existing.status === 'unlocked') {
-      btnHtml = `<a class="unlock-btn gold" href="${existing.jobLink}" target="_blank" rel="noopener">🔗 Open Job</a>`;
+      btnHtml = `<a class="unlock-btn" style="background:var(--sage);color:#fff;text-decoration:none;" href="${existing.jobLink}" target="_blank" rel="noopener">🔗 Open Job</a>`;
     } else {
-      btnHtml = `<button class="unlock-btn" onclick="event.stopPropagation(); openUnlock(${job.id})">
-        🔓 Unlock <span class="unlock-cost">${job.unlockFee}</span>
+      btnHtml = `<button class="unlock-btn" onclick="event.stopPropagation(); openUnlock('${jobId}')">
+        🔓 Unlock <span class="unlock-cost">KES ${job.unlock_kes}</span>
       </button>`;
     }
+
+    const tags = typeof job.tags === 'string' ? JSON.parse(job.tags || '[]') : (job.tags || []);
     const cardClick = (existing && existing.status === 'pending_approval')
       ? `onclick="showToast('⏳ Awaiting admin approval — check My Jobs', 'success')"`
       : (existing && existing.status === 'unlocked' && existing.jobLink)
         ? `onclick="window.open('${existing.jobLink}','_blank')"`
-        : `onclick="openUnlock(${job.id})"`;
+        : `onclick="openUnlock('${jobId}')"`;
 
     return `
     <div class="job-card ${existing ? '' : 'locked'}" ${cardClick}>
-      <div class="job-logo">${job.icon}</div>
+      <div class="job-logo">${job.icon || '✍️'}</div>
       <div class="job-info">
         <div class="job-title">${job.title}</div>
         <div class="job-meta">
           <span>🏢 ${job.company}</span>
-          <span>📍 ${job.location}</span>
-          <span>🕐 ${job.posted}</span>
-          <span>📄 ${job.type}</span>
+          <span>📍 Remote · ${job.country}</span>
+          <span>📄 ${job.pay_type}</span>
         </div>
         <div class="job-tags">
-          ${job.tags.map(t => `<span class="tag">${t}</span>`).join('')}
+          ${tags.map(t => `<span class="tag">${t}</span>`).join('')}
           <span class="tag green">✓ Verified</span>
         </div>
       </div>
       <div class="job-right">
-        <div class="job-pay">${job.pay}</div>
+        <div class="job-pay">$${job.pay_min}–$${job.pay_max}</div>
         ${btnHtml}
       </div>
     </div>`;
@@ -2116,25 +2085,28 @@ function renderJobs(list) {
 function filterJobs(cat, btn) {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  filteredJobs = cat === 'all' ? [...jobs] : jobs.filter(j => j.category === cat);
-  renderJobs(filteredJobs);
+  if (cat === 'all') {
+    filteredJobs = [...jobs];
+    renderJobs(filteredJobs);
+  } else {
+    filteredJobs = jobs.filter(j => j.category === cat);
+    renderJobs(filteredJobs);
+  }
 }
 
 // ── OPEN UNLOCK MODAL ──
 function openUnlock(jobId) {
-  // Require login
   const token = localStorage.getItem('ph_token');
   if (!token) {
     showToast('Please sign in to unlock jobs', 'error');
     openModal('auth');
     return;
   }
-  selectedJob = jobs.find(j => j.id === jobId);
+  selectedJob = jobs.find(j => (j.uuid || j.id) == jobId);
   if (!selectedJob) return;
 
-  // Check if already paid/unlocked
   const unlockedJobs = JSON.parse(localStorage.getItem('ph_unlocked_jobs') || '[]');
-  const existing = unlockedJobs.find(j => j.id === jobId);
+  const existing = unlockedJobs.find(j => j.id == jobId);
   if (existing && existing.status === 'pending_approval') {
     showToast('⏳ This job is awaiting admin approval', 'success');
     openProfile();
@@ -2146,12 +2118,11 @@ function openUnlock(jobId) {
     return;
   }
 
-  document.getElementById('unlockJobIcon').textContent = selectedJob.icon;
+  document.getElementById('unlockJobIcon').textContent = selectedJob.icon || '✍️';
   document.getElementById('unlockJobTitle').textContent = selectedJob.title;
-  document.getElementById('unlockJobPay').textContent = 'Pays ' + selectedJob.pay;
-  document.getElementById('mpesaAmount').textContent = selectedJob.unlockFee;
-  document.getElementById('paypalAmount').textContent = selectedJob.unlockUSD;
-  // Reset payment UI
+  document.getElementById('unlockJobPay').textContent = `Pays $${selectedJob.pay_min}–$${selectedJob.pay_max} ${selectedJob.pay_type}`;
+  document.getElementById('mpesaAmount').textContent = 'KES ' + selectedJob.unlock_kes;
+  document.getElementById('paypalAmount').textContent = '$' + selectedJob.unlock_usd;
   document.getElementById('mpesaPhone').value = '';
   document.getElementById('mpesaInstructions').style.display = 'block';
   document.querySelectorAll('#unlockModal .pay-option').forEach((o,i) => {
@@ -2244,34 +2215,115 @@ function handlePostJob() {
 }
 
 // ── PROCESS UNLOCK PAYMENT ──
-function processUnlock() {
+async function processUnlock() {
+  const token = localStorage.getItem('ph_token');
+  if (!token) { openModal('auth'); return; }
+
+  const btn = document.getElementById('unlockPayBtn');
+
   if (selectedPayment === 'mpesa') {
     const raw = document.getElementById('mpesaPhone').value.replace(/\s+/g, '');
-    // Accept 07XX XXX XXX, 01XX XXX XXX, +2547XX..., 2547XX...
     const valid = /^(?:(?:\+?254|0)[17]\d{8})$/.test(raw);
     if (!valid) {
       showToast('Enter a valid M-Pesa number (e.g. 0712 345 678)', 'error');
       document.getElementById('mpesaPhone').focus();
       return;
     }
-    const btn = document.getElementById('unlockPayBtn');
+
     btn.textContent = '⏳ Sending M-Pesa prompt...';
     btn.disabled = true;
-    setTimeout(() => {
-      btn.textContent = '✓ Confirm on your phone...';
-      setTimeout(() => {
-        closeModal('unlock');
+
+    try {
+      const res = await fetch('/api/mpesa/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ phone: raw, jobUuid: selectedJob.uuid })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showToast(data.error || 'M-Pesa request failed. Try again.', 'error');
         btn.textContent = 'Pay & Unlock Job →';
         btn.disabled = false;
-        recordPendingUnlock();
-      }, 3000);
-    }, 2000);
+        return;
+      }
+
+      // Already unlocked
+      if (data.message === 'Already unlocked') {
+        closeModal('unlock');
+        showToast('✅ Already unlocked — check My Jobs', 'success');
+        btn.textContent = 'Pay & Unlock Job →';
+        btn.disabled = false;
+        return;
+      }
+
+      btn.textContent = '📱 Confirm on your phone...';
+
+      // Poll for payment status every 4 seconds for up to 60 seconds
+      let attempts = 0;
+      const maxAttempts = 15;
+      const checkoutId = data.checkoutRequestId;
+
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const statusRes = await fetch('/api/mpesa/status/' + checkoutId, {
+            headers: { 'Authorization': 'Bearer ' + token }
+          });
+          const statusData = await statusRes.json();
+
+          if (statusData.status === 'completed' || statusData.status === 'pending_approval') {
+            clearInterval(poll);
+            closeModal('unlock');
+            btn.textContent = 'Pay & Unlock Job →';
+            btn.disabled = false;
+            recordPendingUnlock();
+          } else if (statusData.status === 'failed') {
+            clearInterval(poll);
+            showToast('❌ Payment failed or cancelled. Try again.', 'error');
+            btn.textContent = 'Pay & Unlock Job →';
+            btn.disabled = false;
+          } else if (attempts >= maxAttempts) {
+            clearInterval(poll);
+            closeModal('unlock');
+            btn.textContent = 'Pay & Unlock Job →';
+            btn.disabled = false;
+            // Still show pending — callback may arrive later
+            recordPendingUnlock();
+            showToast('⏳ Payment pending — we\'ll notify you once confirmed', 'success');
+          }
+        } catch (e) { /* network blip — keep polling */ }
+      }, 4000);
+
+    } catch (err) {
+      showToast('Network error. Check your connection.', 'error');
+      btn.textContent = 'Pay & Unlock Job →';
+      btn.disabled = false;
+    }
+
   } else {
-    showToast('Redirecting to PayPal...', 'success');
-    setTimeout(() => {
-      closeModal('unlock');
-      recordPendingUnlock();
-    }, 1500);
+    // PayPal unlock — redirect to PayPal
+    btn.textContent = '⏳ Redirecting to PayPal...';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/paypal/create-unlock-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ jobUuid: selectedJob.uuid })
+      });
+      const data = await res.json();
+      if (data.approvalUrl) {
+        window.location.href = data.approvalUrl;
+      } else {
+        showToast(data.error || 'PayPal unavailable. Try M-Pesa.', 'error');
+        btn.textContent = 'Pay & Unlock Job →';
+        btn.disabled = false;
+      }
+    } catch (err) {
+      showToast('Network error. Try again.', 'error');
+      btn.textContent = 'Pay & Unlock Job →';
+      btn.disabled = false;
+    }
   }
 }
 
@@ -2393,25 +2445,41 @@ if (localStorage.getItem('ph_admin') === '1') {
 }
 
 // ── PROCESS POST PAYMENT ──
-function processPostPayment() {
+async function processPostPayment() {
   const btn = document.querySelector('#postPayModal .form-submit');
-  btn.textContent = '⏳ Processing payment...';
+  btn.textContent = '⏳ Creating PayPal order...';
   btn.disabled = true;
-  setTimeout(() => {
-    closeModal('postPay');
+
+  const title    = document.getElementById('jobTitle')?.value.trim();
+  const category = document.getElementById('jobCat')?.value;
+  const budget   = document.getElementById('jobBudget')?.value;
+  const email    = document.getElementById('employerEmail')?.value.trim();
+  const desc     = document.getElementById('jobDesc')?.value.trim();
+  const name     = document.getElementById('employerName')?.value.trim();
+  const applyUrl = document.getElementById('applyUrl')?.value.trim();
+
+  try {
+    const res = await fetch('/api/paypal/create-job-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title, category, budget, description: desc,
+        applyEmail: email, employerName: name, applyUrl
+      })
+    });
+    const data = await res.json();
+    if (data.approvalUrl) {
+      window.location.href = data.approvalUrl;
+    } else {
+      showToast(data.error || 'PayPal unavailable. Try again.', 'error');
+      btn.textContent = 'Pay & Post Job →';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    showToast('Network error. Check your connection.', 'error');
     btn.textContent = 'Pay & Post Job →';
     btn.disabled = false;
-    // Clear the post job form
-    document.getElementById('jobTitle').value = '';
-    document.getElementById('jobCat').value = '';
-    document.getElementById('jobBudget').value = '';
-    document.getElementById('jobDesc').value = '';
-    document.getElementById('employerEmail').value = '';
-    document.getElementById('priceCalc').style.display = 'none';
-    showToast('✅ Job posted! Writers can now see and apply.', 'success');
-    // Scroll to jobs section so employer sees it's live
-    setTimeout(() => document.getElementById('jobs').scrollIntoView({ behavior: 'smooth' }), 500);
-  }, 2000);
+  }
 }
 
 // ── HANDLE AUTH ──
@@ -2757,46 +2825,68 @@ function switchProfileTab(tab, btn) {
   document.getElementById('ptab-' + tab).classList.add('active');
 }
 
-function loadProfileData() {
-  const user = JSON.parse(localStorage.getItem('ph_user') || '{}');
-  if (!user.name) return;
+async function loadProfileData() {
+  const token = localStorage.getItem('ph_token');
+  const cached = JSON.parse(localStorage.getItem('ph_user') || '{}');
+  if (!cached.name) return;
 
-  // Avatar initials
+  // Render immediately from cache, then update from API
+  renderProfileFromUser(cached);
+
+  try {
+    const [profileRes, unlocksRes] = await Promise.all([
+      fetch('/api/user/profile', { headers: { 'Authorization': 'Bearer ' + token } }),
+      fetch('/api/user/unlocks',  { headers: { 'Authorization': 'Bearer ' + token } })
+    ]);
+
+    if (profileRes.ok) {
+      const user = await profileRes.json();
+      localStorage.setItem('ph_user', JSON.stringify(user));
+      renderProfileFromUser(user);
+    }
+
+    if (unlocksRes.ok) {
+      const unlocks = await unlocksRes.json();
+      // Merge API unlocks with localStorage pending items
+      const localPending = JSON.parse(localStorage.getItem('ph_unlocked_jobs') || '[]')
+        .filter(j => j.status === 'pending_approval');
+      profileJobsData = [...unlocks.map(u => ({
+        id: u.uuid,
+        uuid: u.uuid,
+        title: u.title,
+        company: u.company,
+        pay: `$${u.pay_min}–$${u.pay_max} ${u.pay_type}`,
+        icon: '✍️',
+        status: 'unlocked',
+        date: new Date(u.unlocked_at).toLocaleDateString('en-KE', {day:'numeric',month:'short',year:'numeric'}),
+        jobLink: u.apply_url || null
+      })), ...localPending];
+
+      const completed = profileJobsData.filter(j => j.status === 'completed').length;
+      const unlocked  = profileJobsData.filter(j => j.status === 'unlocked').length;
+      document.getElementById('pstatUnlocked').textContent = unlocked;
+      document.getElementById('pstatCompleted').textContent = completed;
+      renderProfileJobs(currentJobFilter);
+      buildActivityFeed(profileJobsData, '');
+    }
+  } catch (e) { /* offline — cached data already shown */ }
+}
+
+function renderProfileFromUser(user) {
   const initials = user.name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
   document.getElementById('profileAvatar').textContent = initials;
   document.getElementById('profileName').textContent = user.name;
   document.getElementById('profileSpeciality').textContent = user.speciality || 'Writer';
-
-  // Pre-fill account form
-  document.getElementById('accName').value = user.name || '';
+  document.getElementById('accName').value  = user.name || '';
   document.getElementById('accEmail').value = user.email || '';
   document.getElementById('accPhone').value = user.phone || '';
   const specEl = document.getElementById('accSpeciality');
   if (user.speciality) specEl.value = user.speciality;
-
-  // Member since
-  const since = user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-KE', {month:'short', year:'numeric'}) : 'Recently';
+  const since = (user.created_at || user.createdAt)
+    ? new Date(user.created_at || user.createdAt).toLocaleDateString('en-KE', {month:'short', year:'numeric'})
+    : 'Recently';
   document.getElementById('memberSince').textContent = 'Member since ' + since;
   document.getElementById('profileMemberBadge').textContent = 'Active Member';
-
-  // Load jobs from localStorage (unlocked jobs stored during session)
-  const stored = JSON.parse(localStorage.getItem('ph_unlocked_jobs') || '[]');
-  profileJobsData = stored;
-
-  // Update stats
-  const completed = stored.filter(j => j.status === 'completed').length;
-  const unlocked  = stored.filter(j => j.status === 'unlocked').length;
-  const totalEarned = stored.filter(j => j.status === 'completed').reduce((s,j) => s + (j.earnedAmount || 0), 0);
-  document.getElementById('pstatUnlocked').textContent = unlocked;
-  document.getElementById('pstatCompleted').textContent = completed;
-  document.getElementById('pstatEarned').textContent = '$' + totalEarned;
-  document.getElementById('overviewEarned').textContent = '$' + totalEarned;
-
-  // Activity feed
-  buildActivityFeed(stored, since);
-
-  // Render jobs list
-  renderProfileJobs('all');
 }
 
 function buildActivityFeed(jobs, memberSince) {
@@ -2892,7 +2982,7 @@ function renderProfileJobs(filter) {
   }).join('');
 }
 
-function saveProfileInfo() {
+async function saveProfileInfo() {
   const name       = document.getElementById('accName').value.trim();
   const email      = document.getElementById('accEmail').value.trim();
   const phone      = document.getElementById('accPhone').value.trim();
@@ -2900,19 +2990,31 @@ function saveProfileInfo() {
 
   if (!name || !email) { showToast('Name and email are required.', 'error'); return; }
 
-  const user = JSON.parse(localStorage.getItem('ph_user') || '{}');
-  const updated = { ...user, name, email, phone, speciality };
-  localStorage.setItem('ph_user', JSON.stringify(updated));
-
-  // Update header display
-  document.getElementById('profileName').textContent = name;
-  document.getElementById('profileSpeciality').textContent = speciality || 'Writer';
-  const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-  document.getElementById('profileAvatar').textContent = initials;
-
-  // Update desktop nav button
-  updateNavForLoggedIn(updated);
-  showToast('✅ Profile updated!', 'success');
+  const token = localStorage.getItem('ph_token');
+  try {
+    const res = await fetch('/api/user/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ name, phone, speciality })
+    });
+    const data = await res.json();
+    if (res.ok && data.user) {
+      localStorage.setItem('ph_user', JSON.stringify(data.user));
+      renderProfileFromUser(data.user);
+      updateNavForLoggedIn(data.user);
+      showToast('✅ Profile updated!', 'success');
+    } else {
+      showToast(data.error || 'Could not update profile.', 'error');
+    }
+  } catch {
+    // Offline fallback
+    const user = JSON.parse(localStorage.getItem('ph_user') || '{}');
+    const updated = { ...user, name, email, phone, speciality };
+    localStorage.setItem('ph_user', JSON.stringify(updated));
+    renderProfileFromUser(updated);
+    updateNavForLoggedIn(updated);
+    showToast('✅ Profile updated!', 'success');
+  }
 }
 
 async function changePassword() {
@@ -3070,6 +3172,7 @@ document.addEventListener('keydown', function(e) {
 
 // ── INIT ──
 checkLoggedIn();
+loadJobs();
 
 // Load live job count for homepage stats
 (async function() {
