@@ -977,19 +977,19 @@
     <div id="registerTab" class="tab-content active">
       <div class="form-group">
         <label>Full Name</label>
-        <input type="text" placeholder="Your full name">
+        <input type="text" id="regName" placeholder="Your full name">
       </div>
       <div class="form-group">
         <label>Email Address</label>
-        <input type="email" placeholder="your@email.com">
+        <input type="email" id="regEmail" placeholder="your@email.com">
       </div>
       <div class="form-group">
         <label>Phone (M-Pesa number)</label>
-        <input type="tel" placeholder="07XX XXX XXX">
+        <input type="tel" id="regPhone" placeholder="07XX XXX XXX">
       </div>
       <div class="form-group">
         <label>Writing Speciality</label>
-        <select>
+        <select id="regSpeciality">
           <option>Blog Writing</option>
           <option>Copywriting</option>
           <option>Technical Writing</option>
@@ -1000,9 +1000,10 @@
       </div>
       <div class="form-group">
         <label>Password</label>
-        <input type="password" placeholder="Create a strong password">
+        <input type="password" id="regPassword" placeholder="Create a strong password">
       </div>
-      <button class="form-submit" onclick="handleRegister()">Create Free Account →</button>
+      <div id="regError" style="color:#b84c2a;font-size:0.82rem;margin-bottom:8px;display:none"></div>
+      <button class="form-submit" id="regBtn" onclick="handleRegister()">Create Free Account →</button>
       <div style="text-align:center; margin-top:16px; font-size:0.8rem; color:var(--muted)">
         Registration is free. You only pay to unlock specific jobs.
       </div>
@@ -1011,13 +1012,14 @@
     <div id="loginTab" class="tab-content">
       <div class="form-group">
         <label>Email Address</label>
-        <input type="email" placeholder="your@email.com">
+        <input type="email" id="loginEmail" placeholder="your@email.com">
       </div>
       <div class="form-group">
         <label>Password</label>
-        <input type="password" placeholder="Your password">
+        <input type="password" id="loginPassword" placeholder="Your password">
       </div>
-      <button class="form-submit" onclick="handleLogin()">Sign In →</button>
+      <div id="loginError" style="color:#b84c2a;font-size:0.82rem;margin-bottom:8px;display:none"></div>
+      <button class="form-submit" id="loginBtn" onclick="handleLogin()">Sign In →</button>
       <div style="text-align:center; margin-top:16px;">
         <a href="#" style="font-size:0.82rem; color:var(--gold); text-decoration:none;">Forgot password?</a>
       </div>
@@ -1368,14 +1370,120 @@ function processPostPayment() {
 }
 
 // ── HANDLE AUTH ──
-function handleRegister() {
-  closeModal('auth');
-  showToast('🎉 Account created! Welcome to PenHire.', 'success');
+async function handleRegister() {
+  const name       = document.getElementById('regName').value.trim();
+  const email      = document.getElementById('regEmail').value.trim();
+  const phone      = document.getElementById('regPhone').value.trim();
+  const speciality = document.getElementById('regSpeciality').value;
+  const password   = document.getElementById('regPassword').value;
+  const errEl      = document.getElementById('regError');
+  const btn        = document.getElementById('regBtn');
+
+  errEl.style.display = 'none';
+  if (!name || !email || !phone || !password) {
+    errEl.textContent = 'Please fill in all fields.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (password.length < 6) {
+    errEl.textContent = 'Password must be at least 6 characters.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.textContent = 'Creating account...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, phone, password, speciality })
+    });
+    const data = await res.json();
+
+    if (data.token) {
+      localStorage.setItem('ph_token', data.token);
+      localStorage.setItem('ph_user', JSON.stringify(data.user));
+      closeModal('auth');
+      showToast('🎉 Welcome to PenHire, ' + data.user.name + '!', 'success');
+      updateNavForLoggedIn(data.user);
+    } else {
+      errEl.textContent = data.error || 'Registration failed. Try again.';
+      errEl.style.display = 'block';
+    }
+  } catch (err) {
+    errEl.textContent = 'Connection error. Please try again.';
+    errEl.style.display = 'block';
+  }
+
+  btn.textContent = 'Create Free Account →';
+  btn.disabled = false;
 }
 
-function handleLogin() {
-  closeModal('auth');
-  showToast('Welcome back! Browse the latest jobs.', 'success');
+async function handleLogin() {
+  const email    = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl    = document.getElementById('loginError');
+  const btn      = document.getElementById('loginBtn');
+
+  errEl.style.display = 'none';
+  if (!email || !password) {
+    errEl.textContent = 'Please enter your email and password.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+
+    if (data.token) {
+      localStorage.setItem('ph_token', data.token);
+      localStorage.setItem('ph_user', JSON.stringify(data.user));
+      closeModal('auth');
+      showToast('Welcome back, ' + data.user.name + '!', 'success');
+      updateNavForLoggedIn(data.user);
+    } else {
+      errEl.textContent = data.error || 'Invalid email or password.';
+      errEl.style.display = 'block';
+    }
+  } catch (err) {
+    errEl.textContent = 'Connection error. Please try again.';
+    errEl.style.display = 'block';
+  }
+
+  btn.textContent = 'Sign In →';
+  btn.disabled = false;
+}
+
+function updateNavForLoggedIn(user) {
+  const navCta = document.querySelector('.nav-cta');
+  if (navCta) {
+    navCta.textContent = '👤 ' + user.name.split(' ')[0];
+    navCta.onclick = showUserMenu;
+  }
+  // Reload jobs to show unlock buttons properly
+  renderJobs(jobs);
+checkLoggedIn();
+}
+
+function showUserMenu() {
+  const user = JSON.parse(localStorage.getItem('ph_user') || '{}');
+  showToast('Logged in as ' + user.email, 'success');
+}
+
+function checkLoggedIn() {
+  const token = localStorage.getItem('ph_token');
+  const user  = JSON.parse(localStorage.getItem('ph_user') || 'null');
+  if (token && user) updateNavForLoggedIn(user);
 }
 
 // ── TOAST NOTIFICATION ──
@@ -1392,6 +1500,7 @@ function showToast(msg, type = 'success') {
 
 // ── INIT ──
 renderJobs(jobs);
+checkLoggedIn();
 
 // Scroll animations
 const observer = new IntersectionObserver((entries) => {
