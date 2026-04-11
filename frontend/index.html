@@ -1229,17 +1229,17 @@
   <p class="section-sub">Two sides, one platform. Writers find real paying work. Employers find skilled writers. Everyone wins.</p>
 
   <div class="steps-grid">
-    <div class="step-card" data-step="1">
+    <div class="step-card" data-step="1" onclick="openModal('auth')" style="cursor:pointer;" title="Create your free account">
       <div class="step-icon">✍️</div>
       <h3>Create Your Profile</h3>
       <p>Register as a writer for free. Add your skills, writing samples, and the niches you specialise in.</p>
     </div>
-    <div class="step-card" data-step="2">
+    <div class="step-card" data-step="2" onclick="document.getElementById('jobs').scrollIntoView({behavior:'smooth'})" style="cursor:pointer;" title="Browse available jobs">
       <div class="step-icon">🔍</div>
       <h3>Browse Job Listings</h3>
       <p>See all available writing jobs posted by employers worldwide. Filter by pay, niche, and deadline.</p>
     </div>
-    <div class="step-card" data-step="3">
+    <div class="step-card" data-step="3" onclick="document.getElementById('jobs').scrollIntoView({behavior:'smooth'})" style="cursor:pointer;" title="Unlock and apply">
       <div class="step-icon">🔓</div>
       <h3>Unlock & Apply</h3>
       <p>Pay a small unlock fee via M-Pesa to reveal full job details and the employer's direct contact. The fee scales with the job pay — fair always.</p>
@@ -1511,7 +1511,7 @@
       <a href="#jobs">Browse Jobs</a>
       <a href="#how-it-works">How It Works</a>
       <a href="#pricing">Unlock Fees</a>
-      <a href="#" onclick="openModal('auth')">Create Account</a>
+      <a href="#" onclick="handleFooterAuth(); return false;">Create Account</a>
     </div>
     <div class="footer-links">
       <h5>Employers</h5>
@@ -1803,15 +1803,15 @@
 
         <div class="p-section-title">Quick Actions</div>
         <div class="quick-actions">
-          <a href="#jobs" class="quick-action" onclick="closeProfile()">
+          <a href="#jobs" class="quick-action" onclick="closeProfile(); setTimeout(()=>document.getElementById('jobs').scrollIntoView({behavior:'smooth'}),200); return false;">
             <span class="qa-icon">🔍</span>
             <span>Browse Jobs</span>
           </a>
-          <a href="#pricing" class="quick-action" onclick="closeProfile()">
+          <a href="#pricing" class="quick-action" onclick="closeProfile(); setTimeout(()=>document.getElementById('pricing').scrollIntoView({behavior:'smooth'}),200); return false;">
             <span class="qa-icon">💳</span>
             <span>View Pricing</span>
           </a>
-          <a href="#post-job" class="quick-action" onclick="closeProfile()">
+          <a href="#post-job" class="quick-action" onclick="closeProfile(); setTimeout(()=>document.getElementById('post-job').scrollIntoView({behavior:'smooth'}),200); return false;">
             <span class="qa-icon">✍️</span>
             <span>Post a Job</span>
           </a>
@@ -1946,7 +1946,7 @@
     <span class="mob-icon">✍️</span>Post a Job
   </a>
   <button class="mob-nav-item mob-profile" id="mob-profile" onclick="handleMobProfile()">
-    <span class="mob-icon">👤</span>Profile
+    <span class="mob-icon" id="mobProfileIcon">👤</span><span id="mobProfileLabel">Profile</span>
   </button>
 </nav>
 
@@ -2185,9 +2185,10 @@ function calculatePostFee() {
   const budget = document.getElementById('jobBudget').value;
   const calc = document.getElementById('priceCalc');
   const display = document.getElementById('postFeeDisplay');
-  if (budget) {
+  const feeMap = { '3': '$3', '5': '$5', '10': '$10', '20': '$20', '40': '$40' };
+  if (budget && feeMap[budget]) {
     calc.style.display = 'flex';
-    display.textContent = '$' + budget;
+    display.textContent = feeMap[budget];
   } else {
     calc.style.display = 'none';
   }
@@ -2367,13 +2368,22 @@ function enableAdmin() {
 // ── PROCESS POST PAYMENT ──
 function processPostPayment() {
   const btn = document.querySelector('#postPayModal .form-submit');
-  btn.textContent = '⏳ Processing...';
+  btn.textContent = '⏳ Processing payment...';
   btn.disabled = true;
   setTimeout(() => {
     closeModal('postPay');
     btn.textContent = 'Pay & Post Job →';
     btn.disabled = false;
+    // Clear the post job form
+    document.getElementById('jobTitle').value = '';
+    document.getElementById('jobCat').value = '';
+    document.getElementById('jobBudget').value = '';
+    document.getElementById('jobDesc').value = '';
+    document.getElementById('employerEmail').value = '';
+    document.getElementById('priceCalc').style.display = 'none';
     showToast('✅ Job posted! Writers can now see and apply.', 'success');
+    // Scroll to jobs section so employer sees it's live
+    setTimeout(() => document.getElementById('jobs').scrollIntoView({ behavior: 'smooth' }), 500);
   }, 2000);
 }
 
@@ -2494,17 +2504,35 @@ function updateNavForLoggedIn(user) {
     navCta.textContent = '👤 ' + user.name.split(' ')[0];
     navCta.onclick = openProfile;
   }
-  // Update mobile profile button label
-  const mobProfile = document.getElementById('mob-profile');
-  if (mobProfile) {
-    mobProfile.querySelector('.mob-icon').textContent = '👤';
-  }
+  // Update mobile profile button
+  const mobIcon = document.getElementById('mobProfileIcon');
+  const mobLabel = document.getElementById('mobProfileLabel');
+  if (mobIcon) mobIcon.textContent = '👤';
+  if (mobLabel) mobLabel.textContent = user.name.split(' ')[0];
   // Show admin link if admin
   if (localStorage.getItem('ph_admin') === '1') {
     const adminLink = document.getElementById('adminNavLink');
     if (adminLink) adminLink.style.display = 'inline';
   }
   renderJobs(filteredJobs);
+}
+
+function handleFooterAuth() {
+  const token = localStorage.getItem('ph_token');
+  if (token) {
+    openProfile();
+  } else {
+    openModal('auth');
+    // Switch to register tab
+    setTimeout(() => {
+      const tabs = document.querySelectorAll('.modal-tab');
+      const contents = document.querySelectorAll('.tab-content');
+      tabs.forEach(t => t.classList.remove('active'));
+      contents.forEach(c => c.classList.remove('active'));
+      if (tabs[0]) tabs[0].classList.add('active');
+      if (contents[0]) contents[0].classList.add('active');
+    }, 50);
+  }
 }
 
 function togglePassword(inputId, btn) {
@@ -2649,7 +2677,15 @@ function showInfoModal(type) {
 function checkLoggedIn() {
   const token = localStorage.getItem('ph_token');
   const user  = JSON.parse(localStorage.getItem('ph_user') || 'null');
-  if (token && user) updateNavForLoggedIn(user);
+  if (token && user) {
+    updateNavForLoggedIn(user);
+  } else {
+    // Set mobile button to Sign In state
+    const mobIcon = document.getElementById('mobProfileIcon');
+    const mobLabel = document.getElementById('mobProfileLabel');
+    if (mobIcon) mobIcon.textContent = '🔑';
+    if (mobLabel) mobLabel.textContent = 'Sign In';
+  }
 }
 
 // ── TOAST NOTIFICATION ──
@@ -2860,6 +2896,7 @@ async function changePassword() {
   if (!current || !newPw || !confirm) { showToast('Fill in all password fields.', 'error'); return; }
   if (newPw.length < 6) { showToast('New password must be at least 6 characters.', 'error'); return; }
   if (newPw !== confirm) { showToast('Passwords do not match.', 'error'); return; }
+  if (newPw === current) { showToast('New password must be different from current.', 'error'); return; }
 
   const token = localStorage.getItem('ph_token');
   try {
@@ -2878,7 +2915,7 @@ async function changePassword() {
       showToast(data.error || 'Could not update password.', 'error');
     }
   } catch {
-    // Offline/demo fallback
+    // Offline fallback — just confirm success (demo mode)
     showToast('✅ Password updated!', 'success');
     document.getElementById('accCurrentPw').value = '';
     document.getElementById('accNewPw').value = '';
@@ -2897,9 +2934,16 @@ function logoutUser() {
   localStorage.removeItem('ph_user');
   localStorage.removeItem('ph_unlocked_jobs');
   closeProfile();
-  // Reset nav CTA
+  // Reset desktop nav CTA
   const navCta = document.querySelector('.nav-cta');
   if (navCta) { navCta.textContent = 'Sign In'; navCta.onclick = () => openModal('auth'); }
+  // Reset mobile profile button to Sign In state
+  const mobIcon = document.getElementById('mobProfileIcon');
+  const mobLabel = document.getElementById('mobProfileLabel');
+  if (mobIcon) mobIcon.textContent = '🔑';
+  if (mobLabel) mobLabel.textContent = 'Sign In';
+  // Re-render jobs without unlock state
+  renderJobs(filteredJobs);
   showToast('You have been signed out.', 'success');
 }
 
@@ -2919,7 +2963,12 @@ function setMobActive(id) {
 
 function handleMobProfile() {
   setMobActive('mob-profile');
-  openProfile();
+  const token = localStorage.getItem('ph_token');
+  if (!token) {
+    openModal('auth');
+  } else {
+    openProfile();
+  }
 }
 
 MOB_SECTIONS.forEach(({ navId }) => {
