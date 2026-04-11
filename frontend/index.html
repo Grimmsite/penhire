@@ -394,6 +394,15 @@
     border-color: var(--gold);
   }
   .form-group textarea { min-height: 100px; resize: vertical; }
+  .password-wrap { position: relative; }
+  .password-wrap input { padding-right: 44px; width: 100%; }
+  .eye-btn {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 1rem; padding: 4px;
+    transition: color 0.2s; line-height: 1;
+  }
+  .eye-btn:hover { color: var(--ink); }
 
   .payment-options { display: flex; flex-direction: column; gap: 12px; margin: 24px 0; }
   .pay-option {
@@ -1000,7 +1009,10 @@
       </div>
       <div class="form-group">
         <label>Password</label>
-        <input type="password" id="regPassword" placeholder="Create a strong password">
+        <div class="password-wrap">
+          <input type="password" id="regPassword" placeholder="Create a strong password">
+          <button type="button" class="eye-btn" onclick="togglePassword('regPassword', this)" title="Show/hide password">👁</button>
+        </div>
       </div>
       <div id="regError" style="color:#b84c2a;font-size:0.82rem;margin-bottom:8px;display:none"></div>
       <button class="form-submit" id="regBtn" onclick="handleRegister()">Create Free Account →</button>
@@ -1016,7 +1028,10 @@
       </div>
       <div class="form-group">
         <label>Password</label>
-        <input type="password" id="loginPassword" placeholder="Your password">
+        <div class="password-wrap">
+          <input type="password" id="loginPassword" placeholder="Your password">
+          <button type="button" class="eye-btn" onclick="togglePassword('loginPassword', this)" title="Show/hide password">👁</button>
+        </div>
       </div>
       <div id="loginError" style="color:#b84c2a;font-size:0.82rem;margin-bottom:8px;display:none"></div>
       <button class="form-submit" id="loginBtn" onclick="handleLogin()">Sign In →</button>
@@ -1473,6 +1488,19 @@ function updateNavForLoggedIn(user) {
   // Reload jobs to show unlock buttons properly
   renderJobs(jobs);
 checkLoggedIn();
+
+function togglePassword(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+    btn.title = 'Hide password';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+    btn.title = 'Show password';
+  }
+}
 }
 
 function showUserMenu() {
