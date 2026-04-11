@@ -588,6 +588,85 @@
   .success-state h3 { font-size: 1.5rem; margin-bottom: 8px; }
   .success-state p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
 
+  /* ── MOBILE BOTTOM NAV ── */
+  .mobile-bottom-nav {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    .mobile-bottom-nav {
+      display: flex;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 1100;
+      background: rgba(247,244,239,0.97);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid rgba(201,168,76,0.25);
+      padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+      justify-content: space-around;
+      align-items: center;
+      box-shadow: 0 -4px 24px rgba(15,14,12,0.10);
+    }
+
+    .mob-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 0.6rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      transition: all 0.2s;
+      min-width: 52px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .mob-nav-item .mob-icon {
+      font-size: 1.25rem;
+      line-height: 1;
+      transition: transform 0.2s;
+    }
+
+    .mob-nav-item:hover,
+    .mob-nav-item.active {
+      color: var(--ink);
+    }
+
+    .mob-nav-item.active .mob-icon {
+      transform: translateY(-2px);
+    }
+
+    .mob-nav-item.mob-profile.active,
+    .mob-nav-item.mob-profile:hover {
+      color: var(--gold);
+    }
+
+    .mob-nav-post {
+      background: var(--ink) !important;
+      color: var(--paper) !important;
+      border-radius: 12px !important;
+      padding: 8px 10px !important;
+    }
+
+    .mob-nav-post:hover,
+    .mob-nav-post.active {
+      background: var(--gold) !important;
+      color: var(--ink) !important;
+    }
+
+    /* Push page content above bottom nav */
+    body { padding-bottom: 80px; }
+  }
+
   /* ── RESPONSIVE ── */
   @media (max-width: 768px) {
     .hero-stats { display: none; }
@@ -1133,6 +1212,30 @@
   </div>
 </div>
 
+<!-- ── MOBILE BOTTOM NAV ── -->
+<nav class="mobile-bottom-nav" id="mobileBottomNav">
+  <a href="#jobs" class="mob-nav-item" id="mob-jobs" onclick="setMobActive('mob-jobs')">
+    <span class="mob-icon">🔍</span>
+    Browse Jobs
+  </a>
+  <a href="#how-it-works" class="mob-nav-item" id="mob-how" onclick="setMobActive('mob-how')">
+    <span class="mob-icon">💡</span>
+    How It Works
+  </a>
+  <a href="#pricing" class="mob-nav-item" id="mob-pricing" onclick="setMobActive('mob-pricing')">
+    <span class="mob-icon">💳</span>
+    Pricing
+  </a>
+  <a href="#post-job" class="mob-nav-item mob-nav-post" id="mob-post" onclick="setMobActive('mob-post')">
+    <span class="mob-icon">✍️</span>
+    Post a Job
+  </a>
+  <button class="mob-nav-item mob-profile" id="mob-profile" onclick="handleMobProfile()">
+    <span class="mob-icon">👤</span>
+    Profile
+  </button>
+</nav>
+
 <!-- ── TOAST ── -->
 <div class="toast" id="toast">
   <span id="toastIcon">✓</span>
@@ -1525,6 +1628,45 @@ function showToast(msg, type = 'success') {
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), 4000);
 }
+
+// ── MOBILE BOTTOM NAV ──
+function setMobActive(id) {
+  document.querySelectorAll('.mob-nav-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+
+function handleMobProfile() {
+  setMobActive('mob-profile');
+  const token = localStorage.getItem('ph_token');
+  if (token) {
+    showUserMenu();
+  } else {
+    openModal('auth');
+  }
+}
+
+// Auto-highlight active nav item based on scroll position
+function updateMobNavOnScroll() {
+  const sections = [
+    { id: 'jobs',         mob: 'mob-jobs'    },
+    { id: 'how-it-works', mob: 'mob-how'     },
+    { id: 'pricing',      mob: 'mob-pricing' },
+    { id: 'post-job',     mob: 'mob-post'    },
+  ];
+  const scrollY = window.scrollY + window.innerHeight / 2;
+  let active = null;
+  sections.forEach(s => {
+    const el = document.getElementById(s.id);
+    if (el && el.offsetTop <= scrollY) active = s.mob;
+  });
+  if (active) {
+    document.querySelectorAll('.mob-nav-item').forEach(el => el.classList.remove('active'));
+    const el = document.getElementById(active);
+    if (el) el.classList.add('active');
+  }
+}
+window.addEventListener('scroll', updateMobNavOnScroll, { passive: true });
 
 // ── INIT ──
 renderJobs(jobs);
