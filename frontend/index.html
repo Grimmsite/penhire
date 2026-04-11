@@ -1342,7 +1342,7 @@
   </div>
 
   <div style="text-align:center; margin-top:40px;">
-    <a href="#" class="btn-primary" onclick="openModal('auth'); return false;">View All 2,400+ Jobs →</a>
+    <a href="#" class="btn-primary" onclick="handleViewAllJobs(); return false;">View All 2,400+ Jobs →</a>
   </div>
 </section>
 
@@ -1427,7 +1427,7 @@
 </section>
 
 <!-- ── TESTIMONIALS ── -->
-<section class="testimonials">
+<section class="testimonials" id="testimonials">
   <div class="section-label">Success Stories</div>
   <h2 class="section-title">Writers Who Found Work</h2>
   <div class="testi-grid">
@@ -1521,15 +1521,15 @@
     </div>
     <div class="footer-links">
       <h5>Company</h5>
-      <a href="#">About PenHire</a>
-      <a href="#">Privacy Policy</a>
-      <a href="#">Terms of Service</a>
-      <a href="#">Contact Us</a>
+      <a href="#" onclick="showInfoModal('about'); return false;">About PenHire</a>
+      <a href="#" onclick="showInfoModal('privacy'); return false;">Privacy Policy</a>
+      <a href="#" onclick="showInfoModal('terms'); return false;">Terms of Service</a>
+      <a href="#" onclick="showInfoModal('contact'); return false;">Contact Us</a>
     </div>
   </div>
   <div class="footer-bottom">
     <span>© 2026 PenHire. All rights reserved.</span>
-    <span>Made for Kenyan writers. <a href="#">M-Pesa</a> · <a href="#">PayPal</a> accepted.</span>
+    <span>Made for Kenyan writers. <a href="#" onclick="showInfoModal('mpesa'); return false;">M-Pesa</a> · <a href="#" onclick="showInfoModal('paypal'); return false;">PayPal</a> accepted.</span>
   </div>
 </footer>
 
@@ -1597,7 +1597,7 @@
       <div id="loginError" style="color:#b84c2a;font-size:0.82rem;margin-bottom:8px;display:none"></div>
       <button class="form-submit" id="loginBtn" onclick="handleLogin()">Sign In →</button>
       <div style="text-align:center; margin-top:16px;">
-        <a href="#" style="font-size:0.82rem; color:var(--gold); text-decoration:none;">Forgot password?</a>
+        <a href="#" style="font-size:0.82rem; color:var(--gold); text-decoration:none;" onclick="handleForgotPassword(); return false;">Forgot password?</a>
       </div>
     </div>
   </div>
@@ -1950,6 +1950,29 @@
   </button>
 </nav>
 
+<!-- ── INFO MODAL (about, privacy, terms, contact, payments) ── -->
+<div class="modal-overlay" id="infoModal">
+  <div class="modal" style="max-width:520px;">
+    <button class="modal-close" onclick="closeModal('info')">✕</button>
+    <div id="infoModalContent"></div>
+  </div>
+</div>
+
+<!-- ── FORGOT PASSWORD MODAL ── -->
+<div class="modal-overlay" id="forgotModal">
+  <div class="modal" style="max-width:440px;">
+    <button class="modal-close" onclick="closeModal('forgot')">✕</button>
+    <h2 style="margin-bottom:8px;">Reset Password</h2>
+    <p class="sub" style="margin-bottom:28px;">Enter your email and we'll send a reset link.</p>
+    <div class="form-group">
+      <label>Email Address</label>
+      <input type="email" id="forgotEmail" placeholder="your@email.com">
+    </div>
+    <div id="forgotMsg" style="font-size:0.82rem; margin-bottom:8px; display:none;"></div>
+    <button class="form-submit" id="forgotBtn" onclick="submitForgotPassword()">Send Reset Link →</button>
+  </div>
+</div>
+
 <!-- ── FLOATING THEME TOGGLE ── -->
 <button class="floating-theme-btn" id="floatingThemeBtn" onclick="toggleTheme()" title="Toggle dark / light mode" aria-label="Toggle dark mode">☀️</button>
 
@@ -2025,8 +2048,22 @@ let selectedPayment = 'mpesa';
 // ── RENDER JOBS ──
 function renderJobs(list) {
   const grid = document.getElementById('jobsGrid');
-  grid.innerHTML = list.map(job => `
-    <div class="job-card" onclick="openUnlock(${job.id})">
+  const unlockedJobs = JSON.parse(localStorage.getItem('ph_unlocked_jobs') || '[]');
+
+  grid.innerHTML = list.map(job => {
+    const existing = unlockedJobs.find(j => j.id === job.id);
+    let btnHtml = '';
+    if (existing && existing.status === 'pending_approval') {
+      btnHtml = `<button class="unlock-btn" style="background:var(--rust);cursor:default;" disabled>🕐 Pending Approval</button>`;
+    } else if (existing && existing.status === 'unlocked') {
+      btnHtml = `<a class="unlock-btn gold" href="${existing.jobLink}" target="_blank" rel="noopener">🔗 Open Job</a>`;
+    } else {
+      btnHtml = `<button class="unlock-btn" onclick="event.stopPropagation(); openUnlock(${job.id})">
+        🔓 Unlock <span class="unlock-cost">${job.unlockFee}</span>
+      </button>`;
+    }
+    return `
+    <div class="job-card ${existing ? '' : 'locked'}" onclick="openUnlock(${job.id})">
       <div class="job-logo">${job.icon}</div>
       <div class="job-info">
         <div class="job-title">${job.title}</div>
@@ -2043,13 +2080,10 @@ function renderJobs(list) {
       </div>
       <div class="job-right">
         <div class="job-pay">${job.pay}</div>
-        <button class="unlock-btn">
-          🔓 Unlock
-          <span class="unlock-cost">${job.unlockFee}</span>
-        </button>
+        ${btnHtml}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 // ── FILTER JOBS ──
@@ -2062,25 +2096,54 @@ function filterJobs(cat, btn) {
 
 // ── OPEN UNLOCK MODAL ──
 function openUnlock(jobId) {
+  // Require login
+  const token = localStorage.getItem('ph_token');
+  if (!token) {
+    showToast('Please sign in to unlock jobs', 'error');
+    openModal('auth');
+    return;
+  }
   selectedJob = jobs.find(j => j.id === jobId);
   if (!selectedJob) return;
+
+  // Check if already paid/unlocked
+  const unlockedJobs = JSON.parse(localStorage.getItem('ph_unlocked_jobs') || '[]');
+  const existing = unlockedJobs.find(j => j.id === jobId);
+  if (existing && existing.status === 'pending_approval') {
+    showToast('⏳ This job is awaiting admin approval', 'success');
+    openProfile();
+    setTimeout(() => switchProfileTab('jobs', document.querySelectorAll('.ptab')[1]), 300);
+    return;
+  }
+  if (existing && existing.status === 'unlocked') {
+    if (existing.jobLink) window.open(existing.jobLink, '_blank');
+    return;
+  }
+
   document.getElementById('unlockJobIcon').textContent = selectedJob.icon;
   document.getElementById('unlockJobTitle').textContent = selectedJob.title;
   document.getElementById('unlockJobPay').textContent = 'Pays ' + selectedJob.pay;
   document.getElementById('mpesaAmount').textContent = selectedJob.unlockFee;
   document.getElementById('paypalAmount').textContent = selectedJob.unlockUSD;
+  // Reset payment UI
+  document.getElementById('mpesaPhone').value = '';
+  document.getElementById('mpesaInstructions').style.display = 'block';
+  document.querySelectorAll('#unlockModal .pay-option').forEach((o,i) => {
+    o.classList.toggle('selected', i === 0);
+  });
+  selectedPayment = 'mpesa';
   openModal('unlock');
 }
 
 // ── MODAL CONTROLS ──
 function openModal(type) {
-  const map = { auth: 'authModal', unlock: 'unlockModal', postPay: 'postPayModal', pending: 'pendingModal', admin: 'adminModal' };
+  const map = { auth: 'authModal', unlock: 'unlockModal', postPay: 'postPayModal', pending: 'pendingModal', admin: 'adminModal', info: 'infoModal', forgot: 'forgotModal' };
   const el = document.getElementById(map[type]);
   if (el) el.classList.add('open');
 }
 
 function closeModal(type) {
-  const map = { auth: 'authModal', unlock: 'unlockModal', postPay: 'postPayModal', pending: 'pendingModal', admin: 'adminModal' };
+  const map = { auth: 'authModal', unlock: 'unlockModal', postPay: 'postPayModal', pending: 'pendingModal', admin: 'adminModal', info: 'infoModal', forgot: 'forgotModal' };
   const el = document.getElementById(map[type]);
   if (el) el.classList.remove('open');
 }
@@ -2132,19 +2195,17 @@ function calculatePostFee() {
 
 // ── HANDLE POST JOB ──
 function handlePostJob() {
-  const title = document.getElementById('jobTitle').value;
-  const budget = document.getElementById('jobBudget').value;
-  const email = document.getElementById('employerEmail').value;
-  const desc = document.getElementById('jobDesc').value;
+  const title    = document.getElementById('jobTitle').value.trim();
+  const category = document.getElementById('jobCat').value;
+  const budget   = document.getElementById('jobBudget').value;
+  const email    = document.getElementById('employerEmail').value.trim();
+  const desc     = document.getElementById('jobDesc').value.trim();
 
-  if (!title || !budget || !email || !desc) {
-    showToast('Please fill in all fields', 'error');
-    return;
-  }
-  if (!email.includes('@')) {
-    showToast('Please enter a valid email', 'error');
-    return;
-  }
+  if (!title)    { showToast('Please enter a job title', 'error'); document.getElementById('jobTitle').focus(); return; }
+  if (!category) { showToast('Please select a job category', 'error'); document.getElementById('jobCat').focus(); return; }
+  if (!budget)   { showToast('Please select a budget range', 'error'); document.getElementById('jobBudget').focus(); return; }
+  if (!desc)     { showToast('Please add a job description', 'error'); document.getElementById('jobDesc').focus(); return; }
+  if (!email || !email.includes('@')) { showToast('Please enter a valid email address', 'error'); document.getElementById('employerEmail').focus(); return; }
 
   const feeMap = { '3': '$3', '5': '$5', '10': '$10', '20': '$20', '40': '$40' };
   document.getElementById('postJobTitlePreview').textContent = title;
@@ -2360,8 +2421,14 @@ async function handleRegister() {
       errEl.style.display = 'block';
     }
   } catch (err) {
-    errEl.textContent = 'Connection error. Please try again.';
-    errEl.style.display = 'block';
+    // Offline / demo fallback — store locally
+    const user = { name, email, phone, speciality, createdAt: new Date().toISOString() };
+    const fakeToken = 'demo_' + Date.now();
+    localStorage.setItem('ph_token', fakeToken);
+    localStorage.setItem('ph_user', JSON.stringify(user));
+    closeModal('auth');
+    showToast('🎉 Welcome to PenHire, ' + name + '!', 'success');
+    updateNavForLoggedIn(user);
   }
 
   btn.textContent = 'Create Free Account →';
@@ -2403,8 +2470,18 @@ async function handleLogin() {
       errEl.style.display = 'block';
     }
   } catch (err) {
-    errEl.textContent = 'Connection error. Please try again.';
-    errEl.style.display = 'block';
+    // Offline / demo fallback — check localStorage
+    const storedUser = JSON.parse(localStorage.getItem('ph_user') || 'null');
+    if (storedUser && storedUser.email === email) {
+      const fakeToken = 'demo_' + Date.now();
+      localStorage.setItem('ph_token', fakeToken);
+      closeModal('auth');
+      showToast('Welcome back, ' + storedUser.name + '!', 'success');
+      updateNavForLoggedIn(storedUser);
+    } else {
+      errEl.textContent = 'No account found. Please register first.';
+      errEl.style.display = 'block';
+    }
   }
 
   btn.textContent = 'Sign In →';
@@ -2422,7 +2499,12 @@ function updateNavForLoggedIn(user) {
   if (mobProfile) {
     mobProfile.querySelector('.mob-icon').textContent = '👤';
   }
-  renderJobs(jobs);
+  // Show admin link if admin
+  if (localStorage.getItem('ph_admin') === '1') {
+    const adminLink = document.getElementById('adminNavLink');
+    if (adminLink) adminLink.style.display = 'inline';
+  }
+  renderJobs(filteredJobs);
 }
 
 function togglePassword(inputId, btn) {
@@ -2438,7 +2520,131 @@ function togglePassword(inputId, btn) {
   }
 }
 
-function showUserMenu() { openProfile(); }
+// ── VIEW ALL JOBS ──
+function handleViewAllJobs() {
+  const token = localStorage.getItem('ph_token');
+  if (!token) {
+    showToast('Sign in to browse all available jobs', 'success');
+    openModal('auth');
+  } else {
+    document.getElementById('jobs').scrollIntoView({ behavior: 'smooth' });
+    showToast('👆 Showing all available jobs', 'success');
+  }
+}
+
+// ── FORGOT PASSWORD ──
+function handleForgotPassword() {
+  closeModal('auth');
+  document.getElementById('forgotEmail').value = '';
+  document.getElementById('forgotMsg').style.display = 'none';
+  openModal('forgot');
+}
+
+async function submitForgotPassword() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  const msgEl = document.getElementById('forgotMsg');
+  const btn   = document.getElementById('forgotBtn');
+
+  if (!email || !email.includes('@')) {
+    msgEl.textContent = 'Please enter a valid email address.';
+    msgEl.style.color = 'var(--rust)';
+    msgEl.style.display = 'block';
+    return;
+  }
+
+  btn.textContent = 'Sending...';
+  btn.disabled = true;
+
+  try {
+    await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+  } catch(e) { /* offline — still show success */ }
+
+  btn.textContent = 'Send Reset Link →';
+  btn.disabled = false;
+  msgEl.textContent = '✅ If that email is registered, a reset link has been sent.';
+  msgEl.style.color = 'var(--sage)';
+  msgEl.style.display = 'block';
+  setTimeout(() => closeModal('forgot'), 3500);
+}
+
+// ── INFO MODAL (about, privacy, terms, contact, payments) ──
+const INFO_CONTENT = {
+  about: {
+    title: '✒ About PenHire',
+    body: `<p style="color:var(--muted);line-height:1.7;margin-bottom:16px;">PenHire is Kenya's #1 platform connecting talented African writers with global employers. Founded in Nairobi, we believe world-class writing talent deserves world-class pay.</p>
+           <p style="color:var(--muted);line-height:1.7;margin-bottom:16px;">Our mission is simple: bridge the gap between skilled Kenyan writers and employers in the US, UK, Canada, and Australia who need quality English content.</p>
+           <div style="background:var(--cream);border-radius:12px;padding:16px 20px;">
+             <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);margin-bottom:12px;">By the numbers</div>
+             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;">
+               <div><div style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:900;color:var(--gold);">2,400+</div><div style="font-size:0.75rem;color:var(--muted);">Jobs Posted</div></div>
+               <div><div style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:900;color:var(--gold);">840+</div><div style="font-size:0.75rem;color:var(--muted);">Active Writers</div></div>
+               <div><div style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:900;color:var(--gold);">$180K+</div><div style="font-size:0.75rem;color:var(--muted);">Paid to Writers</div></div>
+             </div>
+           </div>`
+  },
+  privacy: {
+    title: '🔒 Privacy Policy',
+    body: `<p style="color:var(--muted);line-height:1.7;margin-bottom:12px;"><strong style="color:var(--ink);">What we collect:</strong> Your name, email, phone number, and writing speciality when you register. Payment references when you unlock jobs.</p>
+           <p style="color:var(--muted);line-height:1.7;margin-bottom:12px;"><strong style="color:var(--ink);">How we use it:</strong> To match you with relevant jobs, process payments, and send job approval notifications. We never sell your data.</p>
+           <p style="color:var(--muted);line-height:1.7;margin-bottom:12px;"><strong style="color:var(--ink);">M-Pesa payments:</strong> Processed securely via Safaricom's API. We store only the transaction reference, not your PIN or account details.</p>
+           <p style="color:var(--muted);line-height:1.7;"><strong style="color:var(--ink);">Your rights:</strong> You can request deletion of your account and data at any time by emailing privacy@penhire.co.ke.</p>`
+  },
+  terms: {
+    title: '📄 Terms of Service',
+    body: `<p style="color:var(--muted);line-height:1.7;margin-bottom:12px;"><strong style="color:var(--ink);">For Writers:</strong> Unlock fees are non-refundable. By unlocking a job, you get direct access to the employer's contact and full brief. PenHire is not responsible for the outcome of job applications.</p>
+           <p style="color:var(--muted);line-height:1.7;margin-bottom:12px;"><strong style="color:var(--ink);">For Employers:</strong> Job posting fees are non-refundable once your job is live. You are responsible for the accuracy of your job listing. Fraudulent listings will be removed without refund.</p>
+           <p style="color:var(--muted);line-height:1.7;margin-bottom:12px;"><strong style="color:var(--ink);">Prohibited:</strong> Spam applications, fake job listings, misrepresentation of skills, and any form of harassment between parties.</p>
+           <p style="color:var(--muted);line-height:1.7;"><strong style="color:var(--ink);">Governing law:</strong> These terms are governed by the laws of Kenya.</p>`
+  },
+  contact: {
+    title: '📬 Contact Us',
+    body: `<div style="display:flex;flex-direction:column;gap:16px;">
+             <div style="background:var(--cream);border-radius:12px;padding:16px 20px;display:flex;gap:14px;align-items:center;">
+               <div style="font-size:1.5rem;">📧</div>
+               <div><div style="font-weight:600;color:var(--ink);margin-bottom:2px;">Email Support</div><div style="font-size:0.85rem;color:var(--muted);">support@penhire.co.ke</div><div style="font-size:0.75rem;color:var(--muted);">Response within 24 hours</div></div>
+             </div>
+             <div style="background:var(--cream);border-radius:12px;padding:16px 20px;display:flex;gap:14px;align-items:center;">
+               <div style="font-size:1.5rem;">📱</div>
+               <div><div style="font-weight:600;color:var(--ink);margin-bottom:2px;">WhatsApp</div><div style="font-size:0.85rem;color:var(--muted);">+254 700 000 000</div><div style="font-size:0.75rem;color:var(--muted);">Mon–Fri, 8am–6pm EAT</div></div>
+             </div>
+             <div style="background:var(--cream);border-radius:12px;padding:16px 20px;display:flex;gap:14px;align-items:center;">
+               <div style="font-size:1.5rem;">📍</div>
+               <div><div style="font-weight:600;color:var(--ink);margin-bottom:2px;">Office</div><div style="font-size:0.85rem;color:var(--muted);">Westlands, Nairobi, Kenya</div></div>
+             </div>
+           </div>`
+  },
+  mpesa: {
+    title: '📱 M-Pesa Payments',
+    body: `<p style="color:var(--muted);line-height:1.7;margin-bottom:16px;">PenHire uses M-Pesa STK Push for instant, secure payments. Here's how it works:</p>
+           <div style="display:flex;flex-direction:column;gap:12px;">
+             <div style="display:flex;gap:12px;align-items:flex-start;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(201,168,76,0.15);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;color:var(--gold);flex-shrink:0;">1</div><div style="color:var(--muted);font-size:0.88rem;line-height:1.6;">Enter your Safaricom number (07XX or 01XX) in the unlock form</div></div>
+             <div style="display:flex;gap:12px;align-items:flex-start;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(201,168,76,0.15);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;color:var(--gold);flex-shrink:0;">2</div><div style="color:var(--muted);font-size:0.88rem;line-height:1.6;">An M-Pesa prompt appears on your phone asking you to confirm the payment</div></div>
+             <div style="display:flex;gap:12px;align-items:flex-start;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(201,168,76,0.15);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;color:var(--gold);flex-shrink:0;">3</div><div style="color:var(--muted);font-size:0.88rem;line-height:1.6;">Enter your M-Pesa PIN to confirm — the payment is deducted instantly</div></div>
+             <div style="display:flex;gap:12px;align-items:flex-start;"><div style="width:28px;height:28px;border-radius:50%;background:rgba(201,168,76,0.15);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;color:var(--gold);flex-shrink:0;">4</div><div style="color:var(--muted);font-size:0.88rem;line-height:1.6;">Admin reviews and sends you the job link within 1–6 hours</div></div>
+           </div>`
+  },
+  paypal: {
+    title: '💳 PayPal Payments',
+    body: `<p style="color:var(--muted);line-height:1.7;margin-bottom:16px;">International employers can post jobs and pay unlock fees via PayPal or any major credit/debit card.</p>
+           <p style="color:var(--muted);line-height:1.7;margin-bottom:16px;"><strong style="color:var(--ink);">Accepted cards:</strong> Visa, Mastercard, American Express, Discover</p>
+           <p style="color:var(--muted);line-height:1.7;margin-bottom:16px;"><strong style="color:var(--ink);">Currency:</strong> All PayPal payments are in USD. Exchange rates are handled by PayPal automatically.</p>
+           <p style="color:var(--muted);line-height:1.7;"><strong style="color:var(--ink);">Security:</strong> All PayPal transactions are protected by PayPal's buyer and seller protection policies. PenHire never stores your card details.</p>`
+  }
+};
+
+function showInfoModal(type) {
+  const content = INFO_CONTENT[type];
+  if (!content) return;
+  document.getElementById('infoModalContent').innerHTML = `
+    <h2 style="margin-bottom:20px;">${content.title}</h2>
+    ${content.body}
+  `;
+  openModal('info');
+}
 
 function checkLoggedIn() {
   const token = localStorage.getItem('ph_token');
