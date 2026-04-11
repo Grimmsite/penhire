@@ -348,20 +348,30 @@
   }
   .btn-primary {
     background: var(--gold); color: var(--ink);
-    padding: 14px 32px; border-radius: 8px;
+    padding: 14px 32px; border-radius: 10px;
     font-weight: 700; font-size: 0.95rem;
     text-decoration: none; border: none; cursor: pointer;
-    transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;
+    transition: all 0.22s cubic-bezier(0.34,1.56,0.64,1);
+    display: inline-flex; align-items: center; gap: 8px;
+    box-shadow: 0 2px 8px rgba(201,168,76,0.25), inset 0 1px 0 rgba(255,255,255,0.18);
+    letter-spacing: 0.01em;
   }
-  .btn-primary:hover { background: var(--gold-light); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(201,168,76,0.3); }
+  .btn-primary:hover {
+    background: var(--gold-light);
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px rgba(201,168,76,0.38), inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+  .btn-primary:active { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(201,168,76,0.25); }
   .btn-outline {
     background: transparent; color: var(--paper);
-    padding: 14px 32px; border-radius: 8px;
+    padding: 14px 32px; border-radius: 10px;
     font-weight: 600; font-size: 0.95rem;
-    text-decoration: none; border: 1px solid rgba(247,244,239,0.25); cursor: pointer;
-    transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;
+    text-decoration: none; border: 1.5px solid rgba(247,244,239,0.28); cursor: pointer;
+    transition: all 0.22s; display: inline-flex; align-items: center; gap: 8px;
+    letter-spacing: 0.01em;
   }
-  .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-outline:hover { border-color: var(--gold); color: var(--gold); background: rgba(201,168,76,0.06); }
+  .btn-outline:active { transform: translateY(1px); }
 
   .hero-stats {
     position: absolute; right: 5%; bottom: 10%;
@@ -1153,9 +1163,71 @@
     .post-grid { grid-template-columns: 1fr; }
     .faq-grid { grid-template-columns: 1fr; }
     .nav-links { display: none; }
-    .modal { padding: 32px 24px; }
+    .modal { padding: 28px 20px; }
     .job-card { flex-direction: column; align-items: flex-start; }
     .job-right { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+
+    /* ── MOBILE SPACING FIXES ── */
+    .section { padding: 64px 5%; }
+    .pricing-section { padding: 64px 5%; }
+    .testimonials { padding: 64px 5%; }
+    .faq-section { padding: 64px 5%; }
+    .post-section { padding: 64px 5%; }
+
+    .section-title { font-size: clamp(1.6rem, 7vw, 2.2rem); }
+    .section-sub { font-size: 0.95rem; margin-bottom: 40px; }
+    .steps-grid { gap: 16px; }
+    .step-card { padding: 28px 20px; }
+
+    /* Hero mobile */
+    .hero { padding: 90px 5% 52px; }
+    .hero h1 { font-size: clamp(2.2rem, 9vw, 3.2rem); }
+    .hero p { font-size: 1rem; margin-bottom: 32px; }
+    .hero-actions { flex-direction: column; gap: 12px; }
+    .hero-actions .btn-primary,
+    .hero-actions .btn-outline { width: 100%; justify-content: center; padding: 15px 24px; font-size: 1rem; }
+
+    /* Pricing */
+    .pricing-grid { gap: 14px; }
+    .price-card { padding: 24px 20px; }
+
+    /* Jobs CTA banner (inline grid) */
+    #jobs > div { grid-template-columns: 1fr !important; gap: 28px !important; }
+    #jobs > div > div:last-child { grid-template-columns: 1fr 1fr; }
+    #jobs .btn-primary { width: 100%; justify-content: center; text-align: center; display: inline-flex; }
+
+    /* Testimonials */
+    .testi-grid { gap: 16px; margin-top: 40px; }
+    .testi-card { padding: 24px 20px; }
+
+    /* FAQ */
+    .faq-grid { gap: 14px; margin-top: 40px; }
+    .faq-item { padding: 20px; }
+
+    /* Post form card */
+    .post-form-card { padding: 28px 20px; }
+
+    /* Footer */
+    .footer-top { gap: 28px; }
+
+    /* Toast position on mobile */
+    .toast { bottom: 80px; right: 16px; left: 16px; max-width: none; }
+
+    /* Pricing tabs */
+    .pricing-tabs { flex-wrap: wrap; gap: 8px; }
+  }
+
+  @media (max-width: 480px) {
+    .section { padding: 52px 4%; }
+    .pricing-section { padding: 52px 4%; }
+    .testimonials { padding: 52px 4%; }
+    .faq-section { padding: 52px 4%; }
+    .post-section { padding: 52px 4%; }
+    .step-card { padding: 24px 16px; }
+    .testi-card { padding: 20px 16px; }
+    .faq-item { padding: 18px 16px; }
+    .modal { padding: 24px 16px; border-radius: 16px; }
+    #jobs > div > div:last-child > div { padding: 16px !important; }
   }
 
   /* ── NOTIFICATION TOAST ── */

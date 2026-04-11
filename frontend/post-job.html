@@ -76,8 +76,21 @@
   .price-amount { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 900; color: var(--gold); }
 
   /* ── SUBMIT BTN ── */
-  .submit-btn { width: 100%; padding: 18px; background: var(--gold); color: var(--ink); border: none; border-radius: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 800; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px; }
-  .submit-btn:hover { background: var(--gold-light); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(201,168,76,0.3); }
+  .submit-btn {
+    width: 100%; padding: 18px; background: var(--gold); color: var(--ink);
+    border: none; border-radius: 12px; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 800;
+    transition: all 0.22s cubic-bezier(0.34,1.56,0.64,1);
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    box-shadow: 0 3px 12px rgba(201,168,76,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+    letter-spacing: 0.01em;
+  }
+  .submit-btn:hover {
+    background: var(--gold-light);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(201,168,76,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+  }
+  .submit-btn:active { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(201,168,76,0.25); }
   .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
   .submit-note { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 12px; }
 
@@ -119,10 +132,25 @@
 
   /* ── RESPONSIVE ── */
   @media (max-width: 900px) {
-    .post-layout { grid-template-columns: 1fr; padding: 32px 5%; }
+    .post-layout { grid-template-columns: 1fr; padding: 40px 5%; gap: 32px; }
     .form-card { padding: 32px 24px; }
     .nav-links { display: none; }
-    .form-row { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; gap: 0; }
+    .page-header { padding: 48px 5%; }
+    .page-header h1 { font-size: clamp(1.7rem, 7vw, 2.4rem); }
+    .submit-btn { font-size: 0.98rem; padding: 16px; }
+  }
+
+  @media (max-width: 480px) {
+    .post-layout { padding: 28px 4%; }
+    .form-card { padding: 24px 16px; border-radius: 16px; }
+    .page-header { padding: 40px 4%; }
+    .form-card h2 { font-size: 1.5rem; }
+    .price-preview { flex-direction: column; gap: 8px; align-items: flex-start; }
+    .price-amount { font-size: 1.6rem; }
+    .benefit-card { padding: 18px; }
+    .pricing-table { padding: 20px; }
+    .toast { bottom: 16px; right: 16px; left: 16px; max-width: none; }
   }
 </style>
 </head>
