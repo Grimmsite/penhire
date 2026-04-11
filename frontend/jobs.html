@@ -619,7 +619,7 @@ function renderJobs(jobs, total, pages) {
     const catIcon = { blog:'✍️', copywriting:'📣', technical:'⚙️', academic:'🎓', social:'📱' }[job.category] || '📋';
 
     return `
-    <div class="job-card ${job.is_featured ? 'featured' : ''}" onclick="handleJobClick('${job.uuid}', ${job.unlock_kes}, '${job.unlock_usd}')">
+    <div class="job-card ${job.is_featured ? 'featured' : ''}" onclick="handleJobClick('${job.uuid}', ${job.unlock_kes}, '${job.unlock_usd}', event)">
       <div class="job-logo">${catIcon}</div>
       <div class="job-info">
         <div class="job-title">${escHtml(job.title)}</div>
@@ -702,12 +702,11 @@ function doSearch() {
 }
 
 // ── HANDLE JOB CLICK ──
-function handleJobClick(uuid, unlockKes, unlockUsd) {
+function handleJobClick(uuid, unlockKes, unlockUsd, e) {
   if (unlockedJobs.includes(uuid)) {
     viewUnlockedJob(uuid);
   } else {
-    // get job title from DOM
-    const card = event.currentTarget;
+    const card = (e || event).currentTarget;
     const title = card?.querySelector('.job-title')?.textContent || 'Job';
     const pay   = card?.querySelector('.job-pay')?.textContent || '';
     const icon  = card?.querySelector('.job-logo')?.textContent || '✍️';
@@ -768,15 +767,29 @@ async function processUnlock() {
       btn.disabled = false;
     }
   } else {
-    // PayPal — redirect
-    showToast('Redirecting to PayPal...', 'success');
-    btn.textContent = '⏳ Processing...';
+    // PayPal — create order and redirect
+    btn.textContent = '⏳ Creating PayPal order...';
     btn.disabled = true;
-    setTimeout(() => {
-      closeModal('unlock');
+    try {
+      const res = await fetch('/api/paypal/create-unlock-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ jobUuid: selectedJob.uuid })
+      });
+      const data = await res.json();
+      if (data.approvalUrl) {
+        showToast('Redirecting to PayPal...', 'success');
+        setTimeout(() => { window.location.href = data.approvalUrl; }, 800);
+      } else {
+        showToast(data.error || 'Could not create PayPal order.', 'error');
+        btn.textContent = 'Pay & Unlock Job →';
+        btn.disabled = false;
+      }
+    } catch (e) {
+      showToast('Connection error. Try again.', 'error');
       btn.textContent = 'Pay & Unlock Job →';
       btn.disabled = false;
-    }, 2000);
+    }
   }
 }
 

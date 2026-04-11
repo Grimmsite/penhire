@@ -330,7 +330,6 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<script src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD" data-namespace="paypal_sdk"></script>
 <script>
 // ── THEME ──
 function applyTheme(dark) {
@@ -457,10 +456,18 @@ function resetForm() {
 async function checkPayPalReturn() {
   const params = new URLSearchParams(window.location.search);
   const orderId = params.get('token');
-  const status = window.location.pathname;
+  const cancelled = params.get('cancelled');
 
-  if (orderId && window.location.href.includes('/payment/success')) {
-    // Capture the payment
+  if (cancelled) {
+    showToast('Payment cancelled. You can try again.', 'error');
+    window.history.replaceState({}, '', '/post-job');
+    return;
+  }
+
+  if (orderId) {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Confirming payment...';
     try {
       const res = await fetch(`/api/paypal/capture/${orderId}`, { method: 'POST' });
       const data = await res.json();
@@ -469,8 +476,17 @@ async function checkPayPalReturn() {
         document.getElementById('successState').style.display = 'block';
         showToast('🎉 Job posted successfully!', 'success');
         window.history.replaceState({}, '', '/post-job');
+      } else {
+        showToast(data.error || 'Payment could not be confirmed.', 'error');
+        btn.disabled = false;
+        btn.textContent = '📋 Post Job & Pay with PayPal →';
+        window.history.replaceState({}, '', '/post-job');
       }
-    } catch(e) {}
+    } catch(e) {
+      showToast('Could not confirm payment. Contact support.', 'error');
+      btn.disabled = false;
+      btn.textContent = '📋 Post Job & Pay with PayPal →';
+    }
   }
 }
 
