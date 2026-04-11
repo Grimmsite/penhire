@@ -1705,7 +1705,7 @@
       </div>
     </div>
     <div id="pendingJobInfo" style="background:rgba(201,168,76,0.08); border:1px solid rgba(201,168,76,0.25); border-radius:10px; padding:12px 16px; margin-bottom:24px; font-size:0.85rem; color:var(--ink);"></div>
-    <button class="form-submit" onclick="closeModal('pending'); openProfile(); setTimeout(()=>switchProfileTab('jobs', document.querySelectorAll('.ptab')[1]), 120);" style="margin-bottom:0;">
+    <button class="form-submit" onclick="closeModal('pending'); openProfile(); setTimeout(()=>{const tab=document.querySelectorAll('.ptab')[1]; if(tab) switchProfileTab('jobs', tab);}, 150);" style="margin-bottom:0;">
       View My Jobs →
     </button>
   </div>
@@ -1818,12 +1818,12 @@
             <div class="earnings-val" id="overviewEarned">$0</div>
             <div class="earnings-sub">From completed writing jobs</div>
           </div>
-          <button class="earnings-cta" onclick="switchProfileTab('jobs', document.querySelectorAll('.ptab')[1])">View Jobs →</button>
+          <button class="earnings-cta" onclick="closeProfile(); window.location.href='/jobs';">View Jobs →</button>
         </div>
 
         <div class="p-section-title">Quick Actions</div>
         <div class="quick-actions">
-          <a href="#jobs" class="quick-action" onclick="closeProfile(); setTimeout(()=>document.getElementById('jobs').scrollIntoView({behavior:'smooth'}),200); return false;">
+          <a href="/jobs" class="quick-action" onclick="closeProfile();">
             <span class="qa-icon">🔍</span>
             <span>Browse Jobs</span>
           </a>
@@ -1831,7 +1831,7 @@
             <span class="qa-icon">💳</span>
             <span>View Pricing</span>
           </a>
-          <a href="#post-job" class="quick-action" onclick="closeProfile(); setTimeout(()=>document.getElementById('post-job').scrollIntoView({behavior:'smooth'}),200); return false;">
+          <a href="/post-job" class="quick-action" onclick="closeProfile();">
             <span class="qa-icon">✍️</span>
             <span>Post a Job</span>
           </a>
@@ -1953,7 +1953,7 @@
 
 <!-- ── MOBILE BOTTOM NAV ── -->
 <nav class="mobile-bottom-nav" id="mobileBottomNav">
-  <a href="#jobs" class="mob-nav-item" id="mob-jobs">
+  <a href="/jobs" class="mob-nav-item" id="mob-jobs">
     <span class="mob-icon">🔍</span>Browse Jobs
   </a>
   <a href="#how-it-works" class="mob-nav-item" id="mob-how">
@@ -2645,14 +2645,7 @@ function togglePassword(inputId, btn) {
 
 // ── VIEW ALL JOBS ──
 function handleViewAllJobs() {
-  const token = localStorage.getItem('ph_token');
-  if (!token) {
-    showToast('Sign in to browse all available jobs', 'success');
-    openModal('auth');
-  } else {
-    document.getElementById('jobs').scrollIntoView({ behavior: 'smooth' });
-    showToast('👆 Showing all available jobs', 'success');
-  }
+  window.location.href = '/jobs';
 }
 
 // ── FORGOT PASSWORD ──
