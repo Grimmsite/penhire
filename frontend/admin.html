@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PenHire Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --gold: #c9a84c;
+    --gold-dim: rgba(201,168,76,0.15);
+    --green: #4caf7d;
+    --red: #e05454;
+    --blue: #4c8fc9;
+    --text: #e8e4dc;
+    --muted: #666;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-sans: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-sans); min-height: 100vh; }
+
+  /* ── LOGIN ── */
+  .login-wrap {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+    background-image: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(201,168,76,0.08) 0%, transparent 70%);
+  }
+  .login-box {
+    width: 100%; max-width: 400px; padding: 48px 40px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+  .login-logo {
+    font-family: var(--font-sans); font-size: 1.8rem; font-weight: 800;
+    color: var(--text); margin-bottom: 8px;
+  }
+  .login-logo span { color: var(--gold); }
+  .login-sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 36px; font-family: var(--font-mono); }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .field input {
+    width: 100%; padding: 12px 16px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text);
+    font-family: var(--font-mono); font-size: 0.9rem;
+    outline: none; transition: border-color 0.2s;
+  }
+  .field input:focus { border-color: var(--gold); }
+  .login-btn {
+    width: 100%; padding: 14px; margin-top: 8px;
+    background: var(--gold); color: #0a0a0a;
+    border: none; border-radius: 8px; cursor: pointer;
+    font-family: var(--font-sans); font-size: 0.95rem; font-weight: 800;
+    transition: opacity 0.2s; letter-spacing: 0.05em;
+  }
+  .login-btn:hover { opacity: 0.9; }
+  .login-error { color: var(--red); font-size: 0.82rem; margin-top: 12px; font-family: var(--font-mono); display: none; }
+
+  /* ── DASHBOARD LAYOUT ── */
+  .dashboard { display: none; min-height: 100vh; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 220px;
+    background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; z-index: 100;
+  }
+  .sidebar-logo {
+    padding: 24px 20px; border-bottom: 1px solid var(--border);
+    font-size: 1.2rem; font-weight: 800;
+  }
+  .sidebar-logo span { color: var(--gold); }
+  .sidebar-badge {
+    font-family: var(--font-mono); font-size: 0.65rem;
+    color: var(--muted); display: block; margin-top: 2px;
+  }
+  .nav-items { padding: 16px 12px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    color: var(--muted); font-size: 0.88rem; font-weight: 600;
+    transition: all 0.2s; margin-bottom: 4px; border: none;
+    background: none; width: 100%; text-align: left;
+  }
+  .nav-item:hover { background: var(--border); color: var(--text); }
+  .nav-item.active { background: var(--gold-dim); color: var(--gold); }
+  .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+  .sidebar-footer {
+    padding: 16px 12px; border-top: 1px solid var(--border);
+  }
+  .logout-btn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    color: var(--red); font-size: 0.88rem; font-weight: 600;
+    transition: all 0.2s; border: none; background: none; width: 100%;
+  }
+  .logout-btn:hover { background: rgba(224,84,84,0.1); }
+
+  .main {
+    margin-left: 220px; padding: 32px;
+    min-height: 100vh;
+  }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 32px;
+  }
+  .page-title { font-size: 1.6rem; font-weight: 800; }
+  .page-sub { color: var(--muted); font-size: 0.82rem; font-family: var(--font-mono); margin-top: 4px; }
+  .topbar-actions { display: flex; gap: 12px; }
+
+  /* ── BUTTONS ── */
+  .btn {
+    padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer;
+    font-family: var(--font-sans); font-size: 0.85rem; font-weight: 700;
+    transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-gold { background: var(--gold); color: #0a0a0a; }
+  .btn-gold:hover { opacity: 0.9; }
+  .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-outline:hover { border-color: var(--gold); color: var(--gold); }
+  .btn-red { background: rgba(224,84,84,0.15); color: var(--red); }
+  .btn-green { background: rgba(76,175,125,0.15); color: var(--green); }
+  .btn-sm { padding: 6px 14px; font-size: 0.78rem; }
+
+  /* ── STAT CARDS ── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px; margin-bottom: 32px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px 20px;
+    position: relative; overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .stat-card:hover { border-color: var(--gold); }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--gold); opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .stat-card:hover::before { opacity: 1; }
+  .stat-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; font-family: var(--font-mono); }
+  .stat-value { font-size: 2rem; font-weight: 800; color: var(--text); }
+  .stat-value.gold { color: var(--gold); }
+  .stat-value.green { color: var(--green); }
+  .stat-icon { position: absolute; top: 20px; right: 20px; font-size: 1.4rem; opacity: 0.3; }
+
+  /* ── TABLES ── */
+  .table-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; margin-bottom: 24px;
+  }
+  .table-header {
+    padding: 20px 24px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .table-title { font-size: 1rem; font-weight: 700; }
+  .table-sub { font-size: 0.78rem; color: var(--muted); font-family: var(--font-mono); }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    padding: 12px 24px; text-align: left;
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
+  }
+  td {
+    padding: 14px 24px; font-size: 0.85rem;
+    border-bottom: 1px solid rgba(34,34,34,0.5);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  /* ── BADGES ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 100px;
+    font-size: 0.7rem; font-weight: 700; font-family: var(--font-mono);
+  }
+  .badge-green { background: rgba(76,175,125,0.15); color: var(--green); }
+  .badge-gold { background: var(--gold-dim); color: var(--gold); }
+  .badge-red { background: rgba(224,84,84,0.15); color: var(--red); }
+  .badge-blue { background: rgba(76,143,201,0.15); color: var(--blue); }
+  .badge-muted { background: var(--border); color: var(--muted); }
+
+  /* ── SCRAPE LOG ── */
+  .scrape-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;
+  }
+  .scrape-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+  }
+  .scrape-source { font-size: 0.85rem; font-weight: 700; margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .scrape-meta { font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted); }
+  .scrape-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 12px; }
+  .scrape-bar-fill { height: 100%; background: var(--gold); border-radius: 2px; transition: width 0.5s; }
+
+  /* ── LOADING ── */
+  .loading {
+    display: flex; align-items: center; justify-content: center;
+    padding: 60px; color: var(--muted); font-family: var(--font-mono); font-size: 0.85rem;
+    gap: 12px;
+  }
+  .spinner {
+    width: 20px; height: 20px; border: 2px solid var(--border);
+    border-top-color: var(--gold); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 14px 20px; border-radius: 10px;
+    font-size: 0.85rem; font-family: var(--font-mono);
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.3s; z-index: 9999;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-left: 3px solid var(--green); }
+  .toast.error { border-left: 3px solid var(--red); }
+
+  /* ── SEARCH ── */
+  .search-bar {
+    padding: 10px 16px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); font-family: var(--font-mono);
+    font-size: 0.85rem; outline: none; width: 260px; transition: border-color 0.2s;
+  }
+  .search-bar:focus { border-color: var(--gold); }
+
+  /* ── EMPTY STATE ── */
+  .empty { text-align: center; padding: 48px; color: var(--muted); font-family: var(--font-mono); font-size: 0.85rem; }
+
+  /* ── SCRAPE BTN ANIMATION ── */
+  .scraping { animation: pulse 1s ease infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .sidebar { width: 60px; }
+    .sidebar-logo, .nav-item span, .sidebar-badge, .sidebar-footer span { display: none; }
+    .main { margin-left: 60px; padding: 20px; }
+    .scrape-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN PAGE ── -->
+<div class="login-wrap" id="loginPage">
+  <div class="login-box">
+    <div class="login-logo">✒ Pen<span>Hire</span></div>
+    <div class="login-sub">// admin dashboard</div>
+    <div class="field">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="admin@penhire.com" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="login-btn" onclick="doLogin()">Access Dashboard →</button>
+    <div class="login-error" id="loginError">Invalid credentials. Try again.</div>
+  </div>
+</div>
+
+<!-- ── DASHBOARD ── -->
+<div class="dashboard" id="dashboard">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      ✒ Pen<span>Hire</span>
+      <span class="sidebar-badge">admin panel</span>
+    </div>
+    <nav class="nav-items">
+      <button class="nav-item active" onclick="showPage('overview', this)">
+        <span class="nav-icon">📊</span><span>Overview</span>
+      </button>
+      <button class="nav-item" onclick="showPage('jobs', this)">
+        <span class="nav-icon">💼</span><span>Jobs</span>
+      </button>
+      <button class="nav-item" onclick="showPage('scraper', this)">
+        <span class="nav-icon">🔍</span><span>Scraper</span>
+      </button>
+      <button class="nav-item" onclick="showPage('users', this)">
+        <span class="nav-icon">👥</span><span>Writers</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()">
+        <span>⬅</span><span>Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- ── OVERVIEW PAGE ── -->
+    <div class="page active" id="page-overview">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Overview</div>
+          <div class="page-sub">// platform statistics</div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-outline" onclick="loadStats()">↺ Refresh</button>
+          <button class="btn btn-gold" id="scrapeBtn" onclick="triggerScrape()">⚡ Scrape Now</button>
+        </div>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="loading"><div class="spinner"></div> Loading stats...</div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-header">
+          <div>
+            <div class="table-title">Recent Jobs</div>
+            <div class="table-sub">// last 10 jobs added</div>
+          </div>
+        </div>
+        <div id="recentJobsTable"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ── JOBS PAGE ── -->
+    <div class="page" id="page-jobs">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Jobs</div>
+          <div class="page-sub">// manage all listings</div>
+        </div>
+        <div class="topbar-actions">
+          <input class="search-bar" type="text" placeholder="Search jobs..." oninput="filterJobsTable(this.value)">
+          <button class="btn btn-gold" id="scrapeBtnJobs" onclick="triggerScrape()">⚡ Scrape Now</button>
+        </div>
+      </div>
+      <div class="table-card">
+        <div id="jobsTable"><div class="loading"><div class="spinner"></div> Loading jobs...</div></div>
+      </div>
+    </div>
+
+    <!-- ── SCRAPER PAGE ── -->
+    <div class="page" id="page-scraper">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Scraper</div>
+          <div class="page-sub">// auto job collection logs</div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn btn-gold" onclick="triggerScrape()">⚡ Run Scraper Now</button>
+        </div>
+      </div>
+      <div class="scrape-grid" id="scrapeCards">
+        <div class="loading"><div class="spinner"></div> Loading logs...</div>
+      </div>
+      <div class="table-card">
+        <div class="table-header">
+          <div class="table-title">Scrape History</div>
+          <div class="table-sub">// last 20 runs</div>
+        </div>
+        <div id="scrapeHistory"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ── USERS PAGE ── -->
+    <div class="page" id="page-users">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Writers</div>
+          <div class="page-sub">// registered users</div>
+        </div>
+      </div>
+      <div class="table-card">
+        <div id="usersTable"><div class="loading"><div class="spinner"></div> Loading writers...</div></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = window.location.origin + '/api';
+let TOKEN = localStorage.getItem('ph_admin_token');
+let allJobs = [];
+
+// ── AUTO LOGIN IF TOKEN EXISTS ──
+window.addEventListener('load', () => {
+  if (TOKEN) showDashboard();
+});
+
+// ── LOGIN ──
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value;
+  const pass  = document.getElementById('loginPass').value;
+  if (!email || !pass) return;
+
+  try {
+    const res  = await fetch(`${API}/auth/admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass })
+    });
+    const data = await res.json();
+    if (data.token) {
+      TOKEN = data.token;
+      localStorage.setItem('ph_admin_token', TOKEN);
+      showDashboard();
+    } else {
+      document.getElementById('loginError').style.display = 'block';
+    }
+  } catch {
+    document.getElementById('loginError').style.display = 'block';
+  }
+}
+
+function showDashboard() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'flex';
+  loadStats();
+  loadJobs();
+}
+
+function doLogout() {
+  TOKEN = null;
+  localStorage.removeItem('ph_admin_token');
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('dashboard').style.display = 'none';
+}
+
+// ── AUTH FETCH ──
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(`${API}${path}`, {
+    ...opts,
+    headers: { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json', ...(opts.headers || {}) }
+  });
+  if (res.status === 401) { doLogout(); return null; }
+  return res.json();
+}
+
+// ── NAVIGATION ──
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'scraper') loadScraper();
+  if (name === 'users') loadUsers();
+  if (name === 'jobs') renderJobsTable(allJobs);
+}
+
+// ── LOAD STATS ──
+async function loadStats() {
+  const data = await apiFetch('/admin/stats');
+  if (!data) return;
+
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Active Jobs</div>
+      <div class="stat-value gold">${data.totalJobs}</div>
+      <div class="stat-icon">💼</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Writers</div>
+      <div class="stat-value">${data.totalUsers}</div>
+      <div class="stat-icon">👥</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Unlocks</div>
+      <div class="stat-value green">${data.totalUnlocks}</div>
+      <div class="stat-icon">🔓</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Today's Unlocks</div>
+      <div class="stat-value">${data.todayUnlocks}</div>
+      <div class="stat-icon">📅</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Scrape</div>
+      <div class="stat-value" style="font-size:1rem">${data.lastScrape ? data.lastScrape.source : 'Never'}</div>
+      <div class="stat-icon">🔍</div>
+    </div>
+  `;
+
+  // Recent jobs table
+  if (data.recentJobs?.length) {
+    document.getElementById('recentJobsTable').innerHTML = `
+      <table>
+        <thead><tr><th>Title</th><th>Company</th><th>Source</th><th>Added</th></tr></thead>
+        <tbody>
+          ${data.recentJobs.map(j => `
+            <tr>
+              <td>${j.title}</td>
+              <td>${j.company}</td>
+              <td><span class="badge ${j.source === 'manual' ? 'badge-gold' : 'badge-blue'}">${j.source}</span></td>
+              <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--muted)">${formatDate(j.created_at)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } else {
+    document.getElementById('recentJobsTable').innerHTML = '<div class="empty">No jobs yet. Run the scraper.</div>';
+  }
+}
+
+// ── LOAD JOBS ──
+async function loadJobs() {
+  const data = await apiFetch('/admin/jobs');
+  if (!data) return;
+  allJobs = data;
+  renderJobsTable(allJobs);
+}
+
+function renderJobsTable(jobs) {
+  if (!jobs.length) {
+    document.getElementById('jobsTable').innerHTML = '<div class="empty">No jobs found.</div>';
+    return;
+  }
+  document.getElementById('jobsTable').innerHTML = `
+    <table>
+      <thead><tr><th>Title</th><th>Company</th><th>Category</th><th>Pay</th><th>Source</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        ${jobs.map(j => `
+          <tr id="job-row-${j.id}">
+            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.title}</td>
+            <td style="color:var(--muted)">${j.company}</td>
+            <td><span class="badge badge-muted">${j.category}</span></td>
+            <td style="font-family:var(--font-mono);font-size:0.78rem;color:var(--green)">$${j.pay_min}–$${j.pay_max}</td>
+            <td><span class="badge ${j.source === 'manual' || j.source === 'employer' ? 'badge-gold' : 'badge-blue'}">${j.source}</span></td>
+            <td><span class="badge ${j.is_active ? 'badge-green' : 'badge-red'}">${j.is_active ? '● live' : '○ hidden'}</span></td>
+            <td>
+              <button class="btn btn-sm ${j.is_active ? 'btn-red' : 'btn-green'}" onclick="toggleJob(${j.id}, ${j.is_active})">
+                ${j.is_active ? 'Hide' : 'Show'}
+              </button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function filterJobsTable(q) {
+  const filtered = allJobs.filter(j =>
+    j.title.toLowerCase().includes(q.toLowerCase()) ||
+    j.company.toLowerCase().includes(q.toLowerCase())
+  );
+  renderJobsTable(filtered);
+}
+
+async function toggleJob(id, currentActive) {
+  await apiFetch(`/admin/jobs/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_active: currentActive ? 0 : 1, is_featured: 0 })
+  });
+  toast(`Job ${currentActive ? 'hidden' : 'made live'}`, 'success');
+  loadJobs();
+}
+
+// ── SCRAPER ──
+async function loadScraper() {
+  const data = await apiFetch('/admin/stats');
+  if (!data) return;
+
+  const sources = ['remoteok', 'jobicy', 'weworkremotely', 'freelancer', 'problogger'];
+  const sourceData = {};
+  if (data.scrapeHistory) {
+    for (const log of data.scrapeHistory) {
+      if (!sourceData[log.source]) sourceData[log.source] = log;
+    }
+  }
+
+  document.getElementById('scrapeCards').innerHTML = sources.map(s => {
+    const log = sourceData[s];
+    const pct = log ? Math.min(100, (log.jobs_added / Math.max(log.jobs_found, 1)) * 100) : 0;
+    return `
+      <div class="scrape-card">
+        <div class="scrape-source">
+          <span>${s}</span>
+          <span class="badge ${log?.status === 'success' ? 'badge-green' : log ? 'badge-red' : 'badge-muted'}">
+            ${log?.status || 'pending'}
+          </span>
+        </div>
+        <div class="scrape-meta">
+          ${log ? `Found: ${log.jobs_found} · Added: ${log.jobs_added} · ${log.duration_ms}ms` : 'No data yet'}
+        </div>
+        <div class="scrape-bar"><div class="scrape-bar-fill" style="width:${pct}%"></div></div>
+      </div>
+    `;
+  }).join('');
+
+  if (data.scrapeHistory?.length) {
+    document.getElementById('scrapeHistory').innerHTML = `
+      <table>
+        <thead><tr><th>Source</th><th>Found</th><th>Added</th><th>Status</th><th>Duration</th><th>Time</th></tr></thead>
+        <tbody>
+          ${data.scrapeHistory.map(log => `
+            <tr>
+              <td style="font-family:var(--font-mono)">${log.source}</td>
+              <td>${log.jobs_found}</td>
+              <td style="color:var(--green)">${log.jobs_added}</td>
+              <td><span class="badge ${log.status === 'success' ? 'badge-green' : 'badge-red'}">${log.status}</span></td>
+              <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--muted)">${log.duration_ms}ms</td>
+              <td style="font-family:var(--font-mono);font-size:0.75rem;color:var(--muted)">${formatDate(log.scraped_at)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } else {
+    document.getElementById('scrapeHistory').innerHTML = '<div class="empty">No scrape history yet.</div>';
+  }
+}
+
+// ── USERS ──
+async function loadUsers() {
+  // Use jobs endpoint as proxy to check server is up, users endpoint needs adding
+  document.getElementById('usersTable').innerHTML = `
+    <table>
+      <thead><tr><th>Feature</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Writer Registration</td><td><span class="badge badge-green">● active</span></td></tr>
+        <tr><td>Job Unlocking</td><td><span class="badge badge-green">● active</span></td></tr>
+        <tr><td>M-Pesa Payments</td><td><span class="badge badge-gold">⏳ pending setup</span></td></tr>
+        <tr><td>PayPal Payments</td><td><span class="badge badge-gold">⏳ pending setup</span></td></tr>
+        <tr><td>Email Notifications</td><td><span class="badge badge-green">● active</span></td></tr>
+        <tr><td>Auto Scraper</td><td><span class="badge badge-green">● every 2 hours</span></td></tr>
+      </tbody>
+    </table>
+  `;
+}
+
+// ── TRIGGER SCRAPE ──
+async function triggerScrape() {
+  const btns = document.querySelectorAll('#scrapeBtn, #scrapeBtnJobs');
+  btns.forEach(b => { b.textContent = '⏳ Scraping...'; b.classList.add('scraping'); b.disabled = true; });
+  await apiFetch('/admin/scrape', { method: 'POST' });
+  toast('Scraper started! Jobs will appear in ~30 seconds.', 'success');
+  setTimeout(() => {
+    btns.forEach(b => { b.textContent = b.id === 'scrapeBtn' ? '⚡ Scrape Now' : '⚡ Scrape Now'; b.classList.remove('scraping'); b.disabled = false; });
+    loadStats();
+    loadJobs();
+    if (document.getElementById('page-scraper').classList.contains('active')) loadScraper();
+  }, 35000);
+}
+
+// ── HELPERS ──
+function formatDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('en-KE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = (type === 'success' ? '✓ ' : '✕ ') + msg;
+  el.className = `toast ${type} show`;
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+</script>
+</body>
+</html>

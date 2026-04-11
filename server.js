@@ -298,6 +298,7 @@ app.delete('/api/admin/jobs/:id', adminRequired, (req, res) => {
 });
 
 // ── SERVE FRONTEND ──
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'frontend', 'admin.html')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'index.html'));
 });
