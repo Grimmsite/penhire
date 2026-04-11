@@ -74,7 +74,10 @@ app.post('/api/auth/register', async (req, res) => {
   const user = get('SELECT * FROM users WHERE uuid = ?', [uuid]);
   const token = jwt.sign({ id: user.id, uuid, email, role: 'user' }, process.env.JWT_SECRET, { expiresIn: '30d' });
   emailLib.sendWelcome(user).catch(console.error);
-  res.json({ success: true, token, user: { id: user.id, name, email, speciality } });
+  res.json({
+    success: true, token,
+    user: { id: user.id, uuid: user.uuid, name, email, phone, speciality, bio: '', created_at: user.created_at }
+  });
 });
 
 app.post('/api/auth/login', (req, res) => {
@@ -84,7 +87,10 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password' });
   run('UPDATE users SET last_login = datetime("now") WHERE id = ?', [user.id]);
   const token = jwt.sign({ id: user.id, uuid: user.uuid, email: user.email, role: 'user' }, process.env.JWT_SECRET, { expiresIn: '30d' });
-  res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email, speciality: user.speciality } });
+  res.json({
+    success: true, token,
+    user: { id: user.id, uuid: user.uuid, name: user.name, email: user.email, phone: user.phone, speciality: user.speciality, bio: user.bio || '', created_at: user.created_at }
+  });
 });
 
 app.post('/api/auth/admin', (req, res) => {
@@ -193,12 +199,20 @@ app.post('/api/mpesa/callback', express.raw({ type: '*/*' }), (req, res) => {
     if (result.success) {
       run('UPDATE mpesa_transactions SET status="completed", mpesa_receipt=?, updated_at=datetime("now") WHERE checkout_request_id=?',
         [result.receipt, result.checkoutRequestId]);
-      run('INSERT OR IGNORE INTO unlocks (user_id, job_id, payment_method, amount_kes, transaction_id, status) VALUES (?, ?, "mpesa", ?, ?, "completed")',
+      // Insert unlock as pending_approval — admin must approve before full details are revealed
+      run('INSERT OR IGNORE INTO unlocks (user_id, job_id, payment_method, amount_kes, transaction_id, status) VALUES (?, ?, "mpesa", ?, ?, "pending_approval")',
         [tx.user_id, tx.job_id, tx.amount, result.receipt]);
       run('UPDATE jobs SET unlocks = unlocks + 1 WHERE id = ?', [tx.job_id]);
+      // Notify admin to approve
       const user = get('SELECT * FROM users WHERE id = ?', [tx.user_id]);
       const job  = get('SELECT * FROM jobs WHERE id = ?', [tx.job_id]);
-      if (user && job) emailLib.sendJobUnlocked(user, job).catch(console.error);
+      if (user && job) {
+        emailLib.sendEmail({
+          to: process.env.ADMIN_EMAIL,
+          subject: `⏳ Unlock Approval Needed: ${job.title}`,
+          html: `<p><strong>${user.name}</strong> (${user.email}) paid KES ${tx.amount} via M-Pesa (receipt: ${result.receipt}) to unlock <strong>${job.title}</strong>.</p><p><a href="${process.env.BASE_URL}/admin">Go to Admin Panel to approve →</a></p>`
+        }).catch(console.error);
+      }
     } else {
       run('UPDATE mpesa_transactions SET status="failed", result_desc=? WHERE checkout_request_id=?',
         [result.resultDesc, result.checkoutRequestId]);
@@ -216,7 +230,7 @@ app.get('/api/mpesa/status/:checkoutId', authRequired, (req, res) => {
 // PAYPAL ROUTES
 // ══════════════════════════════════════════
 app.post('/api/paypal/create-job-order', async (req, res) => {
-  const { title, category, budget, description, applyEmail, employerName } = req.body;
+  const { title, category, budget, description, applyEmail, employerName, applyUrl, requirements } = req.body;
   if (!title || !budget || !description || !applyEmail)
     return res.status(400).json({ error: 'All fields required' });
   const feeMap = { '3': 3, '5': 5, '10': 10, '20': 20, '40': 40 };
@@ -224,8 +238,9 @@ app.post('/api/paypal/create-job-order', async (req, res) => {
   if (!fee) return res.status(400).json({ error: 'Invalid budget' });
   try {
     const order = await paypalLib.createOrder({ amount: fee, description: `PenHire Job: ${title}`, referenceId: `job-${Date.now()}` });
-    run('INSERT INTO jobs (uuid, title, company, country, category, pay_min, pay_max, pay_type, description, apply_email, tags, unlock_kes, unlock_usd, post_fee_usd, source, is_active) VALUES (?, ?, ?, "Remote", ?, 20, 100, "Per Project", ?, ?, "[]", 200, 2, ?, "employer", 0)',
-      [order.orderId, title, employerName || 'Employer', category || 'blog', description, applyEmail, fee]);
+    // Store job as inactive (pending admin approval), source = 'employer'
+    run('INSERT INTO jobs (uuid, title, company, country, category, pay_min, pay_max, pay_type, description, requirements, apply_email, apply_url, tags, unlock_kes, unlock_usd, post_fee_usd, source, is_active) VALUES (?, ?, ?, "Remote", ?, 20, 100, "Per Project", ?, ?, ?, ?, "[]", 200, 2, ?, "employer", 0)',
+      [order.orderId, title, employerName || 'Employer', category || 'blog', description, requirements || '', applyEmail, applyUrl || '', fee]);
     res.json({ orderId: order.orderId, approvalUrl: order.approvalUrl });
   } catch (err) {
     res.status(500).json({ error: 'PayPal unavailable' });
@@ -236,14 +251,28 @@ app.post('/api/paypal/capture/:orderId', async (req, res) => {
   try {
     const result = await paypalLib.captureOrder(req.params.orderId);
     if (result.success) {
-      run('UPDATE jobs SET is_active = 1, expires_at = datetime("now", "+30 days"), uuid = ? WHERE uuid = ?',
-        [uuidv4(), req.params.orderId]);
-      const job = get('SELECT * FROM jobs WHERE is_active = 1 ORDER BY id DESC LIMIT 1');
+      // Payment confirmed — update paypal record but keep job inactive (pending_approval)
+      const newUuid = uuidv4();
+      run('UPDATE jobs SET expires_at = datetime("now", "+30 days"), uuid = ?, is_active = 0 WHERE uuid = ?',
+        [newUuid, req.params.orderId]);
+      // Log the paypal transaction
+      run('INSERT INTO paypal_transactions (paypal_order_id, payer_email, amount_usd, status, purpose, reference_id) VALUES (?, ?, ?, "completed", "job_posting", (SELECT id FROM jobs WHERE uuid = ?))',
+        [result.orderId, result.payerEmail, result.amount, newUuid]);
+      // Notify admin to review and approve
+      const job = get('SELECT * FROM jobs WHERE uuid = ?', [newUuid]);
       if (job) {
-        emailLib.sendJobPosted({ email: result.payerEmail }, job).catch(console.error);
-        emailLib.sendAdminNewJob(job).catch(console.error);
+        emailLib.sendEmail({
+          to: process.env.ADMIN_EMAIL,
+          subject: `📋 New Job Posting Needs Approval: ${job.title}`,
+          html: `<p>A new employer job posting has been paid for and is waiting for your approval.</p>
+                 <p><strong>Title:</strong> ${job.title}<br>
+                 <strong>Employer:</strong> ${job.company}<br>
+                 <strong>Email:</strong> ${result.payerEmail}<br>
+                 <strong>Fee paid:</strong> $${result.amount}</p>
+                 <p><a href="${process.env.BASE_URL}/admin">Review & Approve in Admin Panel →</a></p>`
+        }).catch(console.error);
       }
-      res.json({ success: true, message: 'Job posted! Writers can now see it.' });
+      res.json({ success: true, message: 'Payment received! Your job is under review and will go live within 24 hours.' });
     } else {
       res.status(400).json({ error: 'Payment not completed' });
     }
@@ -273,28 +302,84 @@ app.get('/api/user/profile', authRequired, (req, res) => {
   res.json(user);
 });
 
+app.get('/api/user/profile', authRequired, (req, res) => {
+  const user = get('SELECT id, uuid, name, email, phone, speciality, bio, created_at FROM users WHERE id = ?', [req.user.id]);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json(user);
+});
+
+app.patch('/api/user/profile', authRequired, (req, res) => {
+  const { name, phone, speciality, bio } = req.body;
+  if (!name) return res.status(400).json({ error: 'Name is required' });
+  run('UPDATE users SET name = ?, phone = ?, speciality = ?, bio = ? WHERE id = ?',
+    [name, phone || '', speciality || '', bio || '', req.user.id]);
+  const updated = get('SELECT id, uuid, name, email, phone, speciality, bio, created_at FROM users WHERE id = ?', [req.user.id]);
+  res.json({ success: true, user: updated });
+});
+
+app.post('/api/auth/change-password', authRequired, (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Both passwords required' });
+  if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
+  const user = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  if (!bcrypt.compareSync(currentPassword, user.password))
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  run('UPDATE users SET password = ? WHERE id = ?', [bcrypt.hashSync(newPassword, 12), req.user.id]);
+  res.json({ success: true });
+});
+
 // ══════════════════════════════════════════
 // ADMIN ROUTES
 // ══════════════════════════════════════════
 app.get('/api/admin/stats', adminRequired, (req, res) => {
   res.json({
-    totalJobs:    get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1')?.c || 0,
-    totalUsers:   get('SELECT COUNT(*) as c FROM users')?.c || 0,
-    totalUnlocks: get('SELECT COUNT(*) as c FROM unlocks WHERE status = "completed"')?.c || 0,
-    todayUnlocks: get('SELECT COUNT(*) as c FROM unlocks WHERE date(created_at) = date("now") AND status = "completed"')?.c || 0,
-    lastScrape:   get('SELECT * FROM scrape_log ORDER BY id DESC LIMIT 1'),
-    recentJobs:   all('SELECT title, company, source, created_at FROM jobs ORDER BY id DESC LIMIT 10'),
-    scrapeHistory:all('SELECT * FROM scrape_log ORDER BY id DESC LIMIT 20')
+    totalJobs:          get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1')?.c || 0,
+    pendingJobs:        get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 0 AND source = "employer"')?.c || 0,
+    totalUsers:         get('SELECT COUNT(*) as c FROM users')?.c || 0,
+    totalUnlocks:       get('SELECT COUNT(*) as c FROM unlocks WHERE status = "completed"')?.c || 0,
+    pendingUnlocks:     get('SELECT COUNT(*) as c FROM unlocks WHERE status = "pending_approval"')?.c || 0,
+    todayUnlocks:       get('SELECT COUNT(*) as c FROM unlocks WHERE date(created_at) = date("now") AND status = "completed"')?.c || 0,
+    lastScrape:         get('SELECT * FROM scrape_log ORDER BY id DESC LIMIT 1'),
+    recentJobs:         all('SELECT title, company, source, is_active, created_at FROM jobs ORDER BY id DESC LIMIT 10'),
+    scrapeHistory:      all('SELECT * FROM scrape_log ORDER BY id DESC LIMIT 20')
   });
 });
 
-app.post('/api/admin/scrape', adminRequired, (req, res) => {
-  res.json({ success: true, message: 'Scrape started' });
-  runAllScrapers().catch(console.error);
+// ── ADMIN: List all jobs (active + pending) ──
+app.get('/api/admin/jobs', adminRequired, (req, res) => {
+  const { status } = req.query;
+  let where = '';
+  if (status === 'pending') where = 'WHERE is_active = 0 AND source = "employer"';
+  else if (status === 'active') where = 'WHERE is_active = 1';
+  res.json(all(`SELECT * FROM jobs ${where} ORDER BY created_at DESC LIMIT 200`));
 });
 
-app.get('/api/admin/jobs', adminRequired, (req, res) => {
-  res.json(all('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 100'));
+// ── ADMIN: Approve a job posting ──
+app.post('/api/admin/jobs/:id/approve', adminRequired, (req, res) => {
+  const job = get('SELECT * FROM jobs WHERE id = ?', [req.params.id]);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  run('UPDATE jobs SET is_active = 1, expires_at = datetime("now", "+30 days") WHERE id = ?', [req.params.id]);
+  // Email the employer if we have their paypal email from paypal_transactions
+  const tx = get('SELECT payer_email FROM paypal_transactions WHERE reference_id = ? ORDER BY id DESC LIMIT 1', [job.id]);
+  const employerEmail = tx?.payer_email || job.apply_email;
+  emailLib.sendJobPosted({ email: employerEmail }, job).catch(console.error);
+  res.json({ success: true, message: 'Job approved and now live.' });
+});
+
+// ── ADMIN: Reject a job posting ──
+app.post('/api/admin/jobs/:id/reject', adminRequired, (req, res) => {
+  const { reason } = req.body;
+  const job = get('SELECT * FROM jobs WHERE id = ?', [req.params.id]);
+  if (!job) return res.status(404).json({ error: 'Job not found' });
+  run('DELETE FROM jobs WHERE id = ?', [req.params.id]);
+  const tx = get('SELECT payer_email FROM paypal_transactions WHERE reference_id = ? ORDER BY id DESC LIMIT 1', [job.id]);
+  const employerEmail = tx?.payer_email || job.apply_email;
+  emailLib.sendEmail({
+    to: employerEmail,
+    subject: `Your PenHire Job Posting Was Not Approved`,
+    html: `<p>Unfortunately your job posting <strong>${job.title}</strong> was not approved.</p>${reason ? `<p>Reason: ${reason}</p>` : ''}<p>Please contact us if you have questions.</p>`
+  }).catch(console.error);
+  res.json({ success: true, message: 'Job rejected and removed.' });
 });
 
 app.patch('/api/admin/jobs/:id', adminRequired, (req, res) => {
@@ -306,6 +391,68 @@ app.patch('/api/admin/jobs/:id', adminRequired, (req, res) => {
 app.delete('/api/admin/jobs/:id', adminRequired, (req, res) => {
   run('UPDATE jobs SET is_active = 0 WHERE id = ?', [req.params.id]);
   res.json({ success: true });
+});
+
+// ── ADMIN: List pending unlocks ──
+app.get('/api/admin/unlocks', adminRequired, (req, res) => {
+  const { status = 'pending_approval' } = req.query;
+  const unlocks = all(
+    `SELECT u.id, u.status, u.amount_kes, u.transaction_id, u.payment_method, u.created_at,
+     usr.name as user_name, usr.email as user_email, usr.phone as user_phone,
+     j.title as job_title, j.id as job_id, j.uuid as job_uuid, j.pay_min, j.pay_max
+     FROM unlocks u
+     JOIN users usr ON u.user_id = usr.id
+     JOIN jobs j ON u.job_id = j.id
+     WHERE u.status = ?
+     ORDER BY u.created_at DESC`,
+    [status]
+  );
+  res.json(unlocks);
+});
+
+// ── ADMIN: Approve an unlock ──
+app.post('/api/admin/unlocks/:id/approve', adminRequired, (req, res) => {
+  const unlock = get(
+    `SELECT u.*, usr.name as user_name, usr.email as user_email,
+     j.title as job_title, j.id as job_id
+     FROM unlocks u JOIN users usr ON u.user_id = usr.id JOIN jobs j ON u.job_id = j.id
+     WHERE u.id = ?`, [req.params.id]
+  );
+  if (!unlock) return res.status(404).json({ error: 'Unlock not found' });
+  run('UPDATE unlocks SET status = "completed" WHERE id = ?', [req.params.id]);
+  // Send full job details to the writer
+  const user = get('SELECT * FROM users WHERE id = ?', [unlock.user_id]);
+  const job  = get('SELECT * FROM jobs WHERE id = ?', [unlock.job_id]);
+  if (user && job) emailLib.sendJobUnlocked(user, job).catch(console.error);
+  res.json({ success: true, message: `Unlock approved. Email sent to ${unlock.user_email}.` });
+});
+
+// ── ADMIN: Reject an unlock ──
+app.post('/api/admin/unlocks/:id/reject', adminRequired, (req, res) => {
+  const { reason } = req.body;
+  const unlock = get(
+    `SELECT u.*, usr.name as user_name, usr.email as user_email, j.title as job_title
+     FROM unlocks u JOIN users usr ON u.user_id = usr.id JOIN jobs j ON u.job_id = j.id
+     WHERE u.id = ?`, [req.params.id]
+  );
+  if (!unlock) return res.status(404).json({ error: 'Unlock not found' });
+  run('UPDATE unlocks SET status = "rejected" WHERE id = ?', [req.params.id]);
+  emailLib.sendEmail({
+    to: unlock.user_email,
+    subject: `Issue with your unlock: ${unlock.job_title}`,
+    html: `<p>Hi ${unlock.user_name},</p><p>There was an issue verifying your payment for <strong>${unlock.job_title}</strong>.</p>${reason ? `<p>Reason: ${reason}</p>` : ''}<p>Please contact us at <a href="mailto:${process.env.ADMIN_EMAIL}">${process.env.ADMIN_EMAIL}</a> so we can resolve this.</p>`
+  }).catch(console.error);
+  res.json({ success: true, message: 'Unlock rejected. User notified.' });
+});
+
+// ── ADMIN: List all users ──
+app.get('/api/admin/users', adminRequired, (req, res) => {
+  res.json(all('SELECT id, uuid, name, email, phone, speciality, is_active, created_at, last_login FROM users ORDER BY created_at DESC'));
+});
+
+app.post('/api/admin/scrape', adminRequired, (req, res) => {
+  res.json({ success: true, message: 'Scrape started' });
+  runAllScrapers().catch(console.error);
 });
 
 // ── SERVE FRONTEND ──
