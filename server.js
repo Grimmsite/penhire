@@ -63,6 +63,23 @@ app.get('/api/test-email', async (req, res) => {
     res.json({ success: false, error: err.message || String(err) });
   }
 });
+
+// ── SEO ──
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.send('User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: https://penhire.onrender.com/sitemap.xml');
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  res.type('application/xml');
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://penhire.onrender.com/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://penhire.onrender.com/jobs</loc><changefreq>hourly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://penhire.onrender.com/post-job</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+</urlset>`);
+});
+
 // ══════════════════════════════════════════
 // AUTH ROUTES
 // ══════════════════════════════════════════
