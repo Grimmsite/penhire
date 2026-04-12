@@ -597,6 +597,49 @@ async function loadJobs(page = currentPage) {
 }
 
 // ── RENDER JOBS ──
+
+// ── SCHEMA MARKUP FOR SEO ──
+function injectJobSchema(jobs) {
+  document.querySelectorAll('.job-schema').forEach(el => el.remove());
+  jobs.forEach(job => {
+    const schema = {
+      "@context": "https://schema.org/",
+      "@type": "JobPosting",
+      "title": job.title,
+      "description": job.description_preview || job.title,
+      "hiringOrganization": {
+        "@type": "Organization",
+        "name": job.company || "Remote Employer"
+      },
+      "jobLocation": {
+        "@type": "Place",
+        "address": {
+          "@type": "PostalAddress",
+          "addressCountry": job.country || "Remote"
+        }
+      },
+      "baseSalary": {
+        "@type": "MonetaryAmount",
+        "currency": "USD",
+        "value": {
+          "@type": "QuantitativeValue",
+          "minValue": job.pay_min || 0,
+          "maxValue": job.pay_max || 0,
+          "unitText": job.pay_type || "HOUR"
+        }
+      },
+      "employmentType": "CONTRACTOR",
+      "datePosted": job.created_at ? job.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+      "jobLocationType": "TELECOMMUTE",
+      "url": "https://penhire.onrender.com/job/" + job.uuid
+    };
+    const script = document.createElement('script');
+    script.type = 'application/ld+json';
+    script.className = 'job-schema';
+    script.textContent = JSON.stringify(schema);
+    document.head.appendChild(script);
+  });
+}
 function renderJobs(jobs, total, pages) {
   const list = document.getElementById('jobsList');
   document.getElementById('totalCount').textContent = total.toLocaleString();
