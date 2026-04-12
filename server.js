@@ -72,7 +72,7 @@ app.post('/api/auth/register', async (req, res) => {
 
   const user  = get('SELECT * FROM users WHERE uuid = ?', [uuid]);
   const token = jwt.sign({ id: user.id, uuid, email, role: 'user' }, process.env.JWT_SECRET, { expiresIn: '30d' });
-  emailLib.sendWelcome(user).catch(console.error);
+  emailLib.sendWelcome(user).then(() => console.log('Welcome email sent to:', user.email)).catch(err => console.error('Welcome email ERROR:', err.message || err));
   res.json({
     success: true, token,
     user: { id: user.id, uuid: user.uuid, name, email, phone, speciality, bio: '', created_at: user.created_at }
