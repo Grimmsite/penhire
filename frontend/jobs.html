@@ -514,21 +514,8 @@
       </div>
     </div>
     <p style="font-size:0.85rem;color:var(--muted);margin-bottom:24px;line-height:1.6">After payment you'll immediately see the employer's full brief, contact email, and application instructions.</p>
-    <div class="payment-options">
-      <div class="pay-option selected" onclick="selectPay(this,'mpesa')">
-        <div class="pay-icon">📱</div>
-        <div class="pay-info"><div class="pay-name">M-Pesa</div><div class="pay-desc">Pay instantly from your Safaricom number</div></div>
-        <div class="pay-amount" id="uMpesaAmt">KES 250</div>
-      </div>
-      <div class="pay-option" onclick="selectPay(this,'paypal')">
-        <div class="pay-icon">💳</div>
-        <div class="pay-info"><div class="pay-name">PayPal / Card</div><div class="pay-desc">International payment</div></div>
-        <div class="pay-amount" id="uPaypalAmt">$1.00</div>
-      </div>
-    </div>
-    <div id="mpesaFields" style="background:var(--cream);border-radius:12px;padding:16px 20px;margin-bottom:20px;">
-      <p style="font-size:0.82rem;color:var(--muted);line-height:1.6;margin-bottom:12px;"><strong style="color:var(--ink)">M-Pesa STK Push</strong><br>Enter your number. You'll receive a prompt on your phone to confirm.</p>
-      <div class="form-group" style="margin-bottom:0"><input type="tel" id="mpesaPhone" placeholder="07XX XXX XXX" style="background:white;"></div>
+    <div style="background:var(--cream);border-radius:12px;padding:16px 20px;margin-bottom:20px;">
+      <p style="font-size:0.82rem;color:var(--muted);line-height:1.6;"><strong style="color:var(--ink)">Pay with M-Pesa, Card or Bank</strong><br>You will be redirected to a secure IntaSend checkout page.</p>
     </div>
     <button class="form-submit" id="unlockPayBtn" onclick="processUnlock()">Pay & Unlock Job →</button>
     <div style="text-align:center;margin-top:12px;font-size:0.78rem;color:var(--muted)">🔒 Secure · Instant · No hidden fees</div>
@@ -553,7 +540,6 @@ let currentCategory = 'all';
 let currentSource = 'all';
 let currentSearch = '';
 let selectedJob = null;
-let selectedPayMethod = 'mpesa';
 let unlockedJobs = JSON.parse(localStorage.getItem('ph_unlocked') || '[]');
 
 // ── THEME ──
@@ -723,73 +709,37 @@ function openUnlock(uuid, kes, usd, title, pay, icon) {
   document.getElementById('uJobIcon').textContent = icon;
   document.getElementById('uJobTitle').textContent = title;
   document.getElementById('uJobPay').textContent = 'Pays ' + pay;
-  document.getElementById('uMpesaAmt').textContent = 'KES ' + kes;
-  document.getElementById('uPaypalAmt').textContent = '$' + parseFloat(usd).toFixed(2);
+  // amounts removed - using IntaSend checkout
   openModal('unlock');
 }
 
 // ── PROCESS UNLOCK ──
+// ── PROCESS UNLOCK ──
 async function processUnlock() {
   const token = localStorage.getItem('ph_token');
   if (!token || !selectedJob) return;
-
   const btn = document.getElementById('unlockPayBtn');
-
-  if (selectedPayMethod === 'mpesa') {
-    const phone = document.getElementById('mpesaPhone').value.trim();
-    if (!phone || phone.length < 9) { showToast('Enter a valid M-Pesa number', 'error'); return; }
-
-    btn.textContent = '⏳ Sending M-Pesa prompt...';
-    btn.disabled = true;
-
-    try {
-      const res = await fetch('/api/mpesa/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ phone, jobUuid: selectedJob.uuid })
-      });
-      const data = await res.json();
-
-      if (data.success) {
-        btn.textContent = '✓ Confirm on your phone...';
-        // Poll for completion
-        if (data.checkoutRequestId) {
-          pollUnlock(data.checkoutRequestId, selectedJob.uuid);
-        }
-      } else {
-        showToast(data.error || 'M-Pesa request failed', 'error');
-        btn.textContent = 'Pay & Unlock Job →';
-        btn.disabled = false;
-      }
-    } catch (e) {
-      showToast('Connection error. Try again.', 'error');
-      btn.textContent = 'Pay & Unlock Job →';
+  btn.textContent = '⏳ Preparing checkout...';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/intasend/initiate-unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ jobUuid: selectedJob.uuid })
+    });
+    const data = await res.json();
+    if (data.url) {
+      showToast('Redirecting to secure checkout...', 'success');
+      setTimeout(() => { window.location.href = data.url; }, 800);
+    } else {
+      showToast(data.error || 'Could not initiate payment.', 'error');
+      btn.textContent = 'Pay & Unlock Job';
       btn.disabled = false;
     }
-  } else {
-    // PayPal — create order and redirect
-    btn.textContent = '⏳ Creating PayPal order...';
-    btn.disabled = true;
-    try {
-      const res = await fetch('/api/paypal/create-unlock-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ jobUuid: selectedJob.uuid })
-      });
-      const data = await res.json();
-      if (data.approvalUrl) {
-        showToast('Redirecting to PayPal...', 'success');
-        setTimeout(() => { window.location.href = data.approvalUrl; }, 800);
-      } else {
-        showToast(data.error || 'Could not create PayPal order.', 'error');
-        btn.textContent = 'Pay & Unlock Job →';
-        btn.disabled = false;
-      }
-    } catch (e) {
-      showToast('Connection error. Try again.', 'error');
-      btn.textContent = 'Pay & Unlock Job →';
-      btn.disabled = false;
-    }
+  } catch (e) {
+    showToast('Connection error. Try again.', 'error');
+    btn.textContent = 'Pay & Unlock Job';
+    btn.disabled = false;
   }
 }
 
@@ -878,7 +828,6 @@ async function viewUnlockedJob(uuid) {
 function selectPay(el, method) {
   el.closest('.modal').querySelectorAll('.pay-option').forEach(o => o.classList.remove('selected'));
   el.classList.add('selected');
-  selectedPayMethod = method;
   document.getElementById('mpesaFields').style.display = method === 'mpesa' ? 'block' : 'none';
 }
 
