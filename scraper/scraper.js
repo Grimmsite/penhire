@@ -25,11 +25,11 @@ function isWritingJob(title, desc = '') {
 
 // ── UNLOCK FEE CALCULATOR ──
 function calculateFees(payMax) {
-  if (!payMax || payMax < 10)  return { unlock_kes: 50,   unlock_usd: 0.50, post_fee_usd: 3  };
-  if (payMax < 30)             return { unlock_kes: 100,  unlock_usd: 1.00, post_fee_usd: 5  };
-  if (payMax < 100)            return { unlock_kes: 200,  unlock_usd: 2.00, post_fee_usd: 10 };
-  if (payMax < 500)            return { unlock_kes: 500,  unlock_usd: 4.00, post_fee_usd: 20 };
-  return                              { unlock_kes: 1000, unlock_usd: 8.00, post_fee_usd: 40 };
+  if (!payMax || payMax < 10)  return { unlock_kes: 100,  unlock_usd: 1.00, post_fee_usd: 3  };
+  if (payMax < 30)             return { unlock_kes: 250,  unlock_usd: 2.00, post_fee_usd: 5  };
+  if (payMax < 100)            return { unlock_kes: 1000, unlock_usd: 8.00, post_fee_usd: 10 };
+  if (payMax < 500)            return { unlock_kes: 4000, unlock_usd: 32.00, post_fee_usd: 20 };
+  return                              { unlock_kes: 6000, unlock_usd: 48.00, post_fee_usd: 40 };
 }
 
 // ── PARSE PAY FROM TEXT ──
