@@ -495,6 +495,107 @@ async function scrapeWorkew() {
   return added;
 }
 
+// ── NEW SCRAPER: Journalism Jobs ──
+async function scrapeJournalismJobs() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  try {
+    const res = await axios.get('https://www.journalismjobs.com/rss', {
+      headers: { 'User-Agent': UA },
+      timeout: 12000
+    });
+    const $ = cheerio.load(res.data, { xmlMode: true });
+    $('item').each((i, el) => {
+      if (i >= 20) return false;
+      const title = $(el).find('title').text().trim();
+      const desc  = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
+      const url   = $(el).find('link').text().trim();
+      if (!isWritingJob(title, desc)) return;
+      found++;
+      const pay = parsePay(desc);
+      if (insertJob({
+        title, company: 'Remote Employer', country: 'Remote',
+        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'per article',
+        description: desc.slice(0, 2000) || title,
+        apply_url: url, source: 'journalismjobs', source_url: url
+      })) added++;
+    });
+  } catch (err) {
+    console.error('  JournalismJobs error:', err.message);
+  }
+  logScrape('journalismjobs', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ JournalismJobs: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ── NEW SCRAPER: Remote.co ──
+async function scrapeRemoteCo() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  try {
+    const res = await axios.get('https://remote.co/remote-jobs/writer/feed/', {
+      headers: { 'User-Agent': UA },
+      timeout: 12000
+    });
+    const $ = cheerio.load(res.data, { xmlMode: true });
+    $('item').each((i, el) => {
+      if (i >= 20) return false;
+      const title   = $(el).find('title').text().trim();
+      const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
+      const url     = $(el).find('link').text().trim();
+      const company = $(el).find('creator').text().trim() || 'Remote Employer';
+      if (!isWritingJob(title, desc)) return;
+      found++;
+      const pay = parsePay(desc);
+      if (insertJob({
+        title, company, country: 'Remote',
+        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'per article',
+        description: desc.slice(0, 2000) || title,
+        apply_url: url, source: 'remoteco', source_url: url
+      })) added++;
+    });
+  } catch (err) {
+    console.error('  Remote.co error:', err.message);
+  }
+  logScrape('remoteco', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Remote.co: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ── NEW SCRAPER: MediaBistro ──
+async function scrapeMediaBistro() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  try {
+    const res = await axios.get('https://www.mediabistro.com/jobs/rss/', {
+      headers: { 'User-Agent': UA },
+      timeout: 12000
+    });
+    const $ = cheerio.load(res.data, { xmlMode: true });
+    $('item').each((i, el) => {
+      if (i >= 20) return false;
+      const title   = $(el).find('title').text().trim();
+      const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
+      const url     = $(el).find('link').text().trim();
+      const company = $(el).find('company').text().trim() || 'Remote Employer';
+      if (!isWritingJob(title, desc)) return;
+      found++;
+      const pay = parsePay(desc);
+      if (insertJob({
+        title, company, country: 'Remote',
+        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'per article',
+        description: desc.slice(0, 2000) || title,
+        apply_url: url, source: 'mediabistro', source_url: url
+      })) added++;
+    });
+  } catch (err) {
+    console.error('  MediaBistro error:', err.message);
+  }
+  logScrape('mediabistro', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ MediaBistro: ${added}/${found} jobs added`);
+  return added;
+}
+
 // ── SLEEP HELPER ──
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -515,6 +616,9 @@ async function runAllScrapers() {
   total += await scrapeRemoteOK();
   total += await scrapeAuthenticJobs();
   total += await scrapeWorkew();
+  total += await scrapeJournalismJobs();
+  total += await scrapeRemoteCo();
+  total += await scrapeMediaBistro();
 
   const activeJobs = get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1');
   console.log(`\n✅ Scrape complete. New jobs this run: ${total}`);
