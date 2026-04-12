@@ -6,8 +6,6 @@ const path = require('path');
 const fs   = require('fs');
 require('dotenv').config();
 
-// Persistent disk on Render paid tier mounts at /var/data
-// Free tier: in-memory only (data resets on restart - jobs re-scraped automatically)
 const DB_DIR  = fs.existsSync('/var/data') ? '/var/data' : path.join(__dirname, '../database');
 const DB_PATH = path.join(DB_DIR, 'penhire.db');
 
@@ -22,7 +20,6 @@ async function initDB() {
   const initSqlJs = require('sql.js');
   SQL = await initSqlJs();
 
-  // Load existing database from disk if it exists
   if (fs.existsSync(DB_PATH)) {
     const fileBuffer = fs.readFileSync(DB_PATH);
     db = new SQL.Database(fileBuffer);
@@ -34,7 +31,6 @@ async function initDB() {
   return db;
 }
 
-// Save database to disk
 function saveDB() {
   if (!db) return;
   try {
@@ -45,10 +41,9 @@ function saveDB() {
   }
 }
 
-// Auto-save every 30 seconds
 setInterval(saveDB, 30000);
 process.on('exit', saveDB);
-process.on('SIGINT', () => { saveDB(); process.exit(); });
+process.on('SIGINT',  () => { saveDB(); process.exit(); });
 process.on('SIGTERM', () => { saveDB(); process.exit(); });
 
 function getDB() {
@@ -56,13 +51,11 @@ function getDB() {
   return db;
 }
 
-// Helper: run a query that modifies data
 function run(sql, params = []) {
   db.run(sql, params);
   saveDB();
 }
 
-// Helper: get one row
 function get(sql, params = []) {
   const stmt = db.prepare(sql);
   stmt.bind(params);
@@ -75,7 +68,6 @@ function get(sql, params = []) {
   return null;
 }
 
-// Helper: get all rows
 function all(sql, params = []) {
   const results = [];
   const stmt = db.prepare(sql);
@@ -85,12 +77,12 @@ function all(sql, params = []) {
   return results;
 }
 
-// Helper: exec multiple statements
 function exec(sql) {
   db.run(sql);
 }
 
 function ensureSchema() {
+  // ── Users ──
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -107,6 +99,7 @@ function ensureSchema() {
     )
   `);
 
+  // ── Jobs ──
   db.run(`
     CREATE TABLE IF NOT EXISTS jobs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -137,12 +130,13 @@ function ensureSchema() {
     )
   `);
 
+  // ── Unlocks ──
   db.run(`
     CREATE TABLE IF NOT EXISTS unlocks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER,
       job_id INTEGER,
-      payment_method TEXT NOT NULL,
+      payment_method TEXT DEFAULT 'intasend',
       amount_kes INTEGER,
       transaction_id TEXT UNIQUE,
       status TEXT DEFAULT 'pending',
@@ -150,39 +144,27 @@ function ensureSchema() {
     )
   `);
 
+  // ── IntaSend Transactions (replaces mpesa_transactions + paypal_transactions) ──
   db.run(`
-    CREATE TABLE IF NOT EXISTS mpesa_transactions (
+    CREATE TABLE IF NOT EXISTS intasend_transactions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      checkout_request_id TEXT UNIQUE,
-      merchant_request_id TEXT,
-      phone TEXT NOT NULL,
-      amount INTEGER NOT NULL,
-      reference TEXT NOT NULL,
-      status TEXT DEFAULT 'pending',
-      result_code INTEGER,
-      result_desc TEXT,
-      mpesa_receipt TEXT,
-      transaction_date TEXT,
-      user_id INTEGER,
-      job_id INTEGER,
+      invoice_id TEXT UNIQUE,         -- IntaSend invoice/tracking ID
+      api_ref TEXT UNIQUE NOT NULL,   -- Our reference e.g. unlock_3_5_1234 or posting_7_1234
+      purpose TEXT NOT NULL,          -- 'unlock' or 'posting'
+      email TEXT NOT NULL,
+      phone TEXT DEFAULT '',
+      amount REAL NOT NULL,
+      currency TEXT DEFAULT 'KES',
+      status TEXT DEFAULT 'pending',  -- pending | complete | failed
+      user_id INTEGER,                -- for unlocks
+      job_id INTEGER,                 -- for unlocks
+      temp_job_id TEXT,               -- for postings (uuid of pending job)
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     )
   `);
 
-  db.run(`
-    CREATE TABLE IF NOT EXISTS paypal_transactions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      paypal_order_id TEXT UNIQUE,
-      payer_email TEXT,
-      amount_usd REAL NOT NULL,
-      status TEXT DEFAULT 'pending',
-      purpose TEXT NOT NULL,
-      reference_id INTEGER,
-      created_at TEXT DEFAULT (datetime('now'))
-    )
-  `);
-
+  // ── Job Postings ──
   db.run(`
     CREATE TABLE IF NOT EXISTS job_postings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -195,6 +177,7 @@ function ensureSchema() {
     )
   `);
 
+  // ── Scrape Log ──
   db.run(`
     CREATE TABLE IF NOT EXISTS scrape_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -208,6 +191,7 @@ function ensureSchema() {
     )
   `);
 
+  // ── Admins ──
   db.run(`
     CREATE TABLE IF NOT EXISTS admins (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -217,12 +201,14 @@ function ensureSchema() {
     )
   `);
 
-  // Indexes
+  // ── Indexes ──
   db.run(`CREATE INDEX IF NOT EXISTS idx_jobs_category ON jobs(category)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_jobs_active ON jobs(is_active)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_unlocks_user ON unlocks(user_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_intasend_ref ON intasend_transactions(api_ref)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_intasend_status ON intasend_transactions(status)`);
 
-  // Seed admin
+  // ── Seed Admin ──
   const bcrypt = require('bcryptjs');
   const adminEmail = process.env.ADMIN_EMAIL;
   const adminPass  = process.env.ADMIN_PASSWORD;
