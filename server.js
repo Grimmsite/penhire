@@ -54,6 +54,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', jobs: jobs?.c || 0, uptime: process.uptime(), time: new Date().toISOString() });
 });
 
+// EMAIL TEST ROUTE
+app.get('/api/test-email', async (req, res) => {
+  try {
+    await emailLib.sendEmail({ to: process.env.SMTP_USER, subject: 'PenHire Test Email', html: '<p>Test email works!</p>' });
+    res.json({ success: true, message: 'Email sent to ' + process.env.SMTP_USER });
+  } catch(err) {
+    res.json({ success: false, error: err.message || String(err) });
+  }
+});
 // ══════════════════════════════════════════
 // AUTH ROUTES
 // ══════════════════════════════════════════
