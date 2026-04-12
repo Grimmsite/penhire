@@ -190,6 +190,7 @@ app.post('/api/intasend/initiate-unlock', authRequired, async (req, res) => {
   if (existing?.status === 'completed') return res.json({ success: true, message: 'Already unlocked' });
 
   const user = get('SELECT * FROM users WHERE id = ?', [req.user.id]);
+  if (!user) return res.status(404).json({ error: 'User not found. Please sign in again.' });
 
   try {
     const checkout = await createUnlockCheckout({
