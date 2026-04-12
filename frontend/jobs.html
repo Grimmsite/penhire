@@ -514,6 +514,16 @@
       </div>
     </div>
     <p style="font-size:0.85rem;color:var(--muted);margin-bottom:24px;line-height:1.6">After payment you'll immediately see the employer's full brief, contact email, and application instructions.</p>
+    <div class="payment-options">
+      <div class="pay-option selected" onclick="selectPay(this,'mpesa')">
+        <div class="pay-icon">📱</div>
+        <div class="pay-info"><div class="pay-name">M-Pesa</div><div class="pay-desc">Pay instantly from your Safaricom number</div></div>
+        <div class="pay-amount" id="uMpesaAmt">KES 250</div>
+      </div>
+      <div class="pay-option" onclick="selectPay(this,'paypal')">
+        <div class="pay-icon">💳</div>
+        <div class="pay-info"><div class="pay-name">PayPal / Card</div><div class="pay-desc">International payment</div></div>
+        <div class="pay-amount" id="uPaypalAmt">$1.00</div>
       </div>
     </div>
     <div id="mpesaFields" style="background:var(--cream);border-radius:12px;padding:16px 20px;margin-bottom:20px;">
@@ -543,7 +553,7 @@ let currentCategory = 'all';
 let currentSource = 'all';
 let currentSearch = '';
 let selectedJob = null;
-
+let selectedPayMethod = 'mpesa';
 let unlockedJobs = JSON.parse(localStorage.getItem('ph_unlocked') || '[]');
 
 // ── THEME ──
@@ -720,32 +730,96 @@ function openUnlock(uuid, kes, usd, title, pay, icon) {
 
 // ── PROCESS UNLOCK ──
 async function processUnlock() {
-  const token = localStorage.getItem("ph_token");
+  const token = localStorage.getItem('ph_token');
   if (!token || !selectedJob) return;
-  const btn = document.getElementById("unlockPayBtn");
-  btn.textContent = "⏳ Preparing checkout...";
-  btn.disabled = true;
-  try {
-    const res = await fetch("/api/intasend/unlock", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
-      body: JSON.stringify({ jobUuid: selectedJob.uuid })
-    });
-    const data = await res.json();
-    if (data.url) {
-      showToast("Redirecting to secure checkout...", "success");
-      setTimeout(() => { window.location.href = data.url; }, 800);
-    } else {
-      showToast(data.error || "Could not initiate payment.", "error");
-      btn.textContent = "Pay & Unlock Job";
+
+  const btn = document.getElementById('unlockPayBtn');
+
+  if (selectedPayMethod === 'mpesa') {
+    const phone = document.getElementById('mpesaPhone').value.trim();
+    if (!phone || phone.length < 9) { showToast('Enter a valid M-Pesa number', 'error'); return; }
+
+    btn.textContent = '⏳ Sending M-Pesa prompt...';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/mpesa/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ phone, jobUuid: selectedJob.uuid })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        btn.textContent = '✓ Confirm on your phone...';
+        // Poll for completion
+        if (data.checkoutRequestId) {
+          pollUnlock(data.checkoutRequestId, selectedJob.uuid);
+        }
+      } else {
+        showToast(data.error || 'M-Pesa request failed', 'error');
+        btn.textContent = 'Pay & Unlock Job →';
+        btn.disabled = false;
+      }
+    } catch (e) {
+      showToast('Connection error. Try again.', 'error');
+      btn.textContent = 'Pay & Unlock Job →';
       btn.disabled = false;
     }
-  } catch (e) {
-    showToast("Connection error. Try again.", "error");
-    btn.textContent = "Pay & Unlock Job";
-    btn.disabled = false;
+  } else {
+    // PayPal — create order and redirect
+    btn.textContent = '⏳ Creating PayPal order...';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/paypal/create-unlock-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ jobUuid: selectedJob.uuid })
+      });
+      const data = await res.json();
+      if (data.approvalUrl) {
+        showToast('Redirecting to PayPal...', 'success');
+        setTimeout(() => { window.location.href = data.approvalUrl; }, 800);
+      } else {
+        showToast(data.error || 'Could not create PayPal order.', 'error');
+        btn.textContent = 'Pay & Unlock Job →';
+        btn.disabled = false;
+      }
+    } catch (e) {
+      showToast('Connection error. Try again.', 'error');
+      btn.textContent = 'Pay & Unlock Job →';
+      btn.disabled = false;
+    }
   }
 }
+
+// ── POLL FOR M-PESA COMPLETION ──
+async function pollUnlock(checkoutId, jobUuid) {
+  const token = localStorage.getItem('ph_token');
+  let attempts = 0;
+  const interval = setInterval(async () => {
+    attempts++;
+    if (attempts > 20) { clearInterval(interval); return; }
+    try {
+      const res = await fetch(`/api/mpesa/status/${checkoutId}`, {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      const data = await res.json();
+      if (data.status === 'completed') {
+        clearInterval(interval);
+        unlockedJobs.push(jobUuid);
+        localStorage.setItem('ph_unlocked', JSON.stringify(unlockedJobs));
+        closeModal('unlock');
+        document.getElementById('unlockPayBtn').textContent = 'Pay & Unlock Job →';
+        document.getElementById('unlockPayBtn').disabled = false;
+        showToast('🎉 Job unlocked! Check your email for full details.', 'success');
+        loadJobs();
+        viewUnlockedJob(jobUuid);
+      } else if (data.status === 'failed') {
+        clearInterval(interval);
+        showToast('Payment failed. ' + (data.message || ''), 'error');
+        document.getElementById('unlockPayBtn').textContent = 'Pay & Unlock Job →';
+        document.getElementById('unlockPayBtn').disabled = false;
       }
     } catch(e) {}
   }, 3000);
@@ -801,6 +875,12 @@ async function viewUnlockedJob(uuid) {
 }
 
 // ── SELECT PAYMENT METHOD ──
+function selectPay(el, method) {
+  el.closest('.modal').querySelectorAll('.pay-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedPayMethod = method;
+  document.getElementById('mpesaFields').style.display = method === 'mpesa' ? 'block' : 'none';
+}
 
 // ── AUTH ──
 async function handleRegister() {
