@@ -216,6 +216,15 @@
 
   /* ── LOADING / EMPTY ── */
   .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 80px 20px; gap: 16px; color: var(--muted); }
+
+  .skeleton-card { background: var(--white); border: 1.5px solid rgba(15,14,12,0.06); border-radius: 16px; padding: 24px; margin-bottom: 12px; display: flex; gap: 16px; }
+  .skeleton-logo { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(90deg, var(--cream) 25%, #ede9e0 50%, var(--cream) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; flex-shrink: 0; }
+  .skeleton-info { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .skeleton-line { height: 14px; border-radius: 6px; background: linear-gradient(90deg, var(--cream) 25%, #ede9e0 50%, var(--cream) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+  .skeleton-line.short { width: 40%; }
+  .skeleton-line.medium { width: 65%; }
+  .skeleton-line.long { width: 90%; }
+  @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
   .spinner { width: 36px; height: 36px; border: 3px solid var(--cream); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .empty-state { text-align: center; padding: 80px 20px; }
@@ -604,7 +613,16 @@ function toggleTheme() {
 async function loadJobs(page = currentPage) {
   currentPage = page;
   const list = document.getElementById('jobsList');
-  list.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading jobs...</p></div>';
+  list.innerHTML = Array(5).fill(0).map(() => `
+    <div class="skeleton-card">
+      <div class="skeleton-logo"></div>
+      <div class="skeleton-info">
+        <div class="skeleton-line medium"></div>
+        <div class="skeleton-line short"></div>
+        <div class="skeleton-line long"></div>
+        <div class="skeleton-line short"></div>
+      </div>
+    </div>`).join('');
 
   const sort = document.getElementById('sortSelect').value;
   const params = new URLSearchParams({
