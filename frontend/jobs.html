@@ -390,7 +390,7 @@
     <h1>Browse Writing Jobs<br><span>Updated Every 30 Minutes</span></h1>
     <p>Real jobs scraped from 9 platforms worldwide. Pay a small M-Pesa fee to unlock full details and apply directly.</p>
     <div class="search-wrap">
-      <input type="text" class="search-input" id="searchInput" placeholder="Search jobs, companies, keywords..." onkeydown="if(event.key==='Enter') doSearch()">
+      <input type="text" class="search-input" id="searchInput" placeholder="Search jobs, companies, keywords..." onkeydown="if(event.key==='Enter') doSearch()" oninput="debouncedSearch()">
       <button class="search-btn" onclick="doSearch()">🔍 Search</button>
     </div>
   </div>
@@ -797,6 +797,11 @@ function setSourceFilter(src, btn) {
   loadJobs();
 }
 
+let searchTimer;
+function debouncedSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => doSearch(), 400);
+}
 function doSearch() {
   currentSearch = document.getElementById('searchInput').value.trim();
   currentPage = 1;
