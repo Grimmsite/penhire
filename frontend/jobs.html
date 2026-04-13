@@ -33,7 +33,7 @@
     --shadow-lg: 0 12px 48px rgba(0,0,0,0.55);
   }
   html.dark nav { background: rgba(14,13,11,0.97) !important; }
-  html.dark .job-card { transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);  background: var(--white); border-color: rgba(255,255,255,0.06); }
+  html.dark .job-card { background: var(--white); border-color: rgba(255,255,255,0.06); }
   html.dark .job-title { color: var(--ink); }
   html.dark .filter-btn { border-color: rgba(255,255,255,0.12); color: var(--muted); }
   html.dark .filter-btn.active { background: var(--ink); color: var(--paper); }
@@ -177,7 +177,7 @@
     display: flex; align-items: flex-start; gap: 20px;
     transition: all 0.25s; cursor: pointer; position: relative;
   }
-  .job-card:hover { box-shadow: 0 8px 32px rgba(201,168,76,0.15), 0 2px 8px rgba(0,0,0,0.08); border-color: rgba(201,168,76,0.5); transform: translateX(6px) translateY(-2px); }
+  .job-card:hover { box-shadow: var(--shadow); border-color: rgba(201,168,76,0.35); transform: translateX(4px); }
   .job-card.featured { border-color: var(--gold); }
   .job-card.featured::before { content: '⭐ Featured'; position: absolute; top: -1px; right: 20px; background: var(--gold); color: var(--ink); font-size: 0.65rem; font-weight: 700; padding: 3px 10px; border-radius: 0 0 8px 8px; }
   .job-logo {
