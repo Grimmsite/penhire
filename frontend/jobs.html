@@ -627,6 +627,21 @@ async function loadJobs(page = currentPage) {
 
 // ── RENDER JOBS ──
 
+
+// ── ANIMATED COUNTER ──
+function animateCounter(el, target) {
+  const duration = 1000;
+  const start = performance.now();
+  const startVal = 0;
+  function update(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    const ease = 1 - Math.pow(1 - progress, 3);
+    el.textContent = Math.floor(startVal + (target - startVal) * ease).toLocaleString();
+    if (progress < 1) requestAnimationFrame(update);
+  }
+  requestAnimationFrame(update);
+}
 // ── SCHEMA MARKUP FOR SEO ──
 function injectJobSchema(jobs) {
   document.querySelectorAll('.job-schema').forEach(el => el.remove());
@@ -671,7 +686,7 @@ function injectJobSchema(jobs) {
 }
 function renderJobs(jobs, total, pages) {
   const list = document.getElementById('jobsList');
-  document.getElementById('totalCount').textContent = total.toLocaleString();
+  animateCounter(document.getElementById('totalCount'), total);
   document.getElementById('resultsInfo').innerHTML = `Showing <strong>${jobs.length}</strong> of <strong>${total}</strong> jobs`;
   document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString('en-KE', {hour:'2-digit', minute:'2-digit'});
 
