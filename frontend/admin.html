@@ -287,9 +287,14 @@
           <div class="page-sub">// review and approve writer unlock requests</div>
         </div>
         <div class="topbar-actions">
+          <div id="autoApproveBadge" style="display:none;align-items:center;gap:8px;padding:7px 14px;background:rgba(76,175,125,0.12);border:1px solid rgba(76,175,125,0.25);border-radius:8px;font-size:0.75rem;font-family:var(--font-mono);color:var(--green);">
+            <span style="animation:pulse 1.5s ease infinite;display:inline-block;">⚡</span> Auto-approve ON
+          </div>
           <button class="btn btn-outline" onclick="loadApprovals()">↺ Refresh</button>
+          <button class="btn btn-green btn-sm" onclick="autoProcessPendingApprovals(true)">⚡ Process All Now</button>
         </div>
       </div>
+      <div id="autoApproveLog" style="display:none;background:rgba(76,175,125,0.06);border:1px solid rgba(76,175,125,0.15);border-radius:10px;padding:14px 18px;margin-bottom:18px;font-family:var(--font-mono);font-size:0.75rem;color:var(--muted);max-height:120px;overflow-y:auto;"></div>
       <div class="filter-tabs">
         <button class="ftab active" onclick="filterApprovals('pending', this)">🕐 Pending</button>
         <button class="ftab" onclick="filterApprovals('approved', this)">✅ Approved</button>
@@ -477,6 +482,8 @@ let currentApprovalFilter = 'pending';
 let currentUserFilter = 'all';
 let currentPaymentFilter = 'all';
 let rejectTargetId = null;
+let autoApproveEnabled = false;
+let autoApproveInterval = null;
 
 // ── INIT ──
 window.addEventListener('load', () => { if (TOKEN) showDashboard(); });
@@ -505,11 +512,13 @@ function showDashboard() {
   loadStats();
   loadJobs();
   loadApprovals();
+  initAutoApprove(); // check setting and start loop if enabled
 }
 
 function doLogout() {
   TOKEN = null;
   localStorage.removeItem('ph_admin_token');
+  stopAutoApproveLoop();
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('dashboard').style.display = 'none';
 }
@@ -582,6 +591,11 @@ function updatePendingBadge(count) {
 // ── APPROVALS ──
 async function loadApprovals() {
   document.getElementById('approvalsList').innerHTML = '<div class="loading"><div class="spinner"></div> Loading...</div>';
+  // Ensure jobs are loaded so we can auto-fetch apply URLs
+  if (!allJobs.length) {
+    const jobData = await apiFetch('/admin/jobs');
+    if (jobData) allJobs = jobData;
+  }
   const data = await apiFetch('/admin/unlocks');
   if (!data) return;
   allApprovals = data;
@@ -613,6 +627,12 @@ function renderApprovals(filter) {
     const isPending = a.status === 'pending_approval';
     const hoursAgo = a.created_at ? Math.round((Date.now() - new Date(a.created_at)) / 3600000) : 0;
     const urgent = isPending && hoursAgo >= 3;
+
+    // Auto-populate URL: prefer stored job_url, then look up apply_url from allJobs by job_id
+    const jobMatch = a.job_id ? allJobs.find(j => j.id === a.job_id) : null;
+    const autoUrl = a.job_url || jobMatch?.apply_url || jobMatch?.job_url || '';
+    const urlFetched = !a.job_url && autoUrl; // show indicator if we auto-filled it
+
     return `
     <div class="approval-card ${urgent ? 'urgent' : ''}" id="approval-${a.id}">
       <div class="approval-header">
@@ -623,6 +643,7 @@ function renderApprovals(filter) {
             <span>💰 KES ${a.amount_kes ?? '?'}</span>
             <span>📅 ${fmtDate(a.created_at)}</span>
             ${urgent ? '<span style="color:var(--orange)">⚠ ' + hoursAgo + 'h waiting</span>' : ''}
+            ${a.job_id ? `<span style="color:var(--muted)">job #${a.job_id}</span>` : ''}
           </div>
           <div class="approval-user" style="margin-top:8px;">
             <span>👤</span>
@@ -638,16 +659,22 @@ function renderApprovals(filter) {
       </div>
       ${isPending ? `
         <div>
-          <input class="url-input" id="jobUrl-${a.id}" placeholder="Paste the job URL to send to the writer (e.g. https://upwork.com/jobs/...)" value="${escHtml(a.job_url || '')}">
+          <div style="position:relative;">
+            <input class="url-input" id="jobUrl-${a.id}"
+              placeholder="Apply URL (auto-fetched or paste manually)"
+              value="${escHtml(autoUrl)}">
+            ${urlFetched ? `<div style="font-size:0.68rem;color:var(--green);font-family:var(--font-mono);margin-top:4px;">✓ URL auto-fetched from job listing</div>` : ''}
+          </div>
           <div class="approve-row">
-            <button class="btn btn-green btn-sm" onclick="approveUnlock(${a.id})">✅ Approve & Send Link</button>
+            <button class="btn btn-green btn-sm" onclick="approveUnlock(${a.id}, ${a.job_id || 'null'})">✅ Approve & Send Link</button>
+            <button class="btn btn-blue btn-sm" onclick="fetchJobUrl(${a.id}, ${a.job_id || 'null'})">🔗 Fetch URL</button>
             <button class="btn btn-red btn-sm" onclick="openRejectModal(${a.id})">❌ Reject</button>
-            <button class="btn btn-blue btn-sm" onclick="viewUserFromApproval('${escHtml(a.user_email || '')}')">👤 View User</button>
+            <button class="btn btn-outline btn-sm" onclick="viewUserFromApproval('${escHtml(a.user_email || '')}')">👤 User</button>
           </div>
         </div>
       ` : `
         <div style="font-size:0.78rem;color:var(--muted);font-family:var(--font-mono);">
-          ${a.job_url ? `Job URL: <a href="${escHtml(a.job_url)}" target="_blank" style="color:var(--gold)">${escHtml(a.job_url)}</a>` : 'No URL provided'}
+          ${a.job_url ? `Job URL: <a href="${escHtml(a.job_url)}" target="_blank" style="color:var(--gold)">${escHtml(a.job_url)}</a>` : 'No URL recorded'}
           ${a.reviewed_at ? ' · Reviewed: ' + fmtDate(a.reviewed_at) : ''}
         </div>
       `}
@@ -655,15 +682,41 @@ function renderApprovals(filter) {
   }).join('');
 }
 
-async function approveUnlock(id) {
-  const url = document.getElementById(`jobUrl-${id}`)?.value.trim();
+async function approveUnlock(id, jobId) {
+  let url = document.getElementById(`jobUrl-${id}`)?.value.trim();
+  const approval = allApprovals.find(a => a.id === id);
+
+  // Auto-lookup from allJobs cache
+  let job = jobId ? allJobs.find(j => j.id === jobId) : null;
+
+  if (!url && jobId) {
+    url = job?.apply_url || job?.job_url || '';
+    if (url && document.getElementById(`jobUrl-${id}`)) document.getElementById(`jobUrl-${id}`).value = url;
+  }
+
+  // Fresh API fetch if still no URL
+  if (!url && jobId) {
+    const freshJob = await apiFetch(`/admin/jobs/${jobId}`);
+    if (freshJob) { job = freshJob; url = freshJob.apply_url || freshJob.job_url || ''; if (url && document.getElementById(`jobUrl-${id}`)) document.getElementById(`jobUrl-${id}`).value = url; }
+  }
+
   if (!url || !url.startsWith('http')) {
-    toast('Please enter a valid job URL starting with https://', 'error');
+    toast('No apply URL found. Please paste the job URL manually.', 'error');
     return;
   }
+
+  const payload = {
+    jobUrl:         url,
+    jobTitle:       job?.title       || approval?.job_title || '',
+    company:        job?.company      || approval?.company   || '',
+    jobDescription: job?.description  || '',
+    payMin:         job?.pay_min      || '',
+    payMax:         job?.pay_max      || '',
+  };
+
   const res = await apiFetch(`/admin/unlocks/${id}/approve`, {
     method: 'POST',
-    body: JSON.stringify({ jobUrl: url })
+    body: JSON.stringify(payload)
   });
   if (res?.success || res?.message) {
     toast('✅ Unlock approved — writer notified!', 'success');
@@ -671,6 +724,33 @@ async function approveUnlock(id) {
     loadStats();
   } else {
     toast(res?.error || 'Could not approve unlock', 'error');
+  }
+}
+
+async function fetchJobUrl(approvalId, jobId) {
+  if (!jobId) { toast('No job linked to this approval', 'error'); return; }
+  const input = document.getElementById(`jobUrl-${approvalId}`);
+  if (!input) return;
+
+  // First try from allJobs cache
+  const cached = allJobs.find(j => j.id === jobId);
+  const cachedUrl = cached?.apply_url || cached?.job_url || '';
+  if (cachedUrl) {
+    input.value = cachedUrl;
+    toast('✅ URL fetched from job listing', 'success');
+    return;
+  }
+
+  // Fall back to API
+  input.placeholder = 'Fetching…';
+  const job = await apiFetch(`/admin/jobs/${jobId}`);
+  input.placeholder = 'Apply URL (auto-fetched or paste manually)';
+  const url = job?.apply_url || job?.job_url || '';
+  if (url) {
+    input.value = url;
+    toast('✅ URL fetched from job listing', 'success');
+  } else {
+    toast('No apply URL on this job — paste it manually', 'error');
   }
 }
 
@@ -1028,34 +1108,44 @@ async function loadSettings() {
 
   const status = data?.status || {};
   document.getElementById('platformStatus').innerHTML = [
-    { key: 'registrations_open', label: 'Writer Registrations', desc: 'Allow new writers to sign up' },
-    { key: 'unlocks_enabled', label: 'Job Unlocking', desc: 'Allow writers to pay and unlock jobs' },
-    { key: 'mpesa_enabled', label: 'M-Pesa Payments', desc: 'Accept M-Pesa STK push payments' },
-    { key: 'paypal_enabled', label: 'PayPal Payments', desc: 'Accept PayPal / card payments' },
-    { key: 'scraper_enabled', label: 'Auto Scraper', desc: 'Scrape new jobs every 2 hours' },
-    { key: 'job_posting_enabled', label: 'Employer Job Posting', desc: 'Allow employers to post jobs' },
+    { key: 'registrations_open',   label: 'Writer Registrations',  desc: 'Allow new writers to sign up' },
+    { key: 'unlocks_enabled',      label: 'Job Unlocking',          desc: 'Allow writers to pay and unlock jobs' },
+    { key: 'auto_approve_unlocks', label: '⚡ Auto-Approve Unlocks', desc: 'Instantly email writers their job URL & description upon successful payment — no manual review needed', highlight: true },
+    { key: 'mpesa_enabled',        label: 'M-Pesa Payments',        desc: 'Accept M-Pesa STK push payments' },
+    { key: 'paypal_enabled',       label: 'PayPal Payments',        desc: 'Accept PayPal / card payments' },
+    { key: 'scraper_enabled',      label: 'Auto Scraper',           desc: 'Scrape new jobs every 2 hours' },
+    { key: 'job_posting_enabled',  label: 'Employer Job Posting',   desc: 'Allow employers to post jobs' },
   ].map(item => `
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);${item.highlight ? 'background:rgba(201,168,76,0.04);margin:0 -8px;padding:12px 8px;border-radius:8px;border:1px solid rgba(201,168,76,0.15);margin-bottom:4px;' : ''}">
       <div>
-        <div style="font-size:0.88rem;font-weight:700">${item.label}</div>
+        <div style="font-size:0.88rem;font-weight:700;${item.highlight ? 'color:var(--gold)' : ''}">${item.label}</div>
         <div style="font-size:0.75rem;color:var(--muted);font-family:var(--font-mono)">${item.desc}</div>
       </div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-        <input type="checkbox" id="toggle-${item.key}" ${status[item.key] !== false ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--gold);">
-        <span id="toggleLabel-${item.key}" style="font-size:0.75rem;font-family:var(--font-mono);color:${status[item.key] !== false ? 'var(--green)' : 'var(--red)'}">
-          ${status[item.key] !== false ? 'enabled' : 'disabled'}
+        <input type="checkbox" id="toggle-${item.key}" ${status[item.key] ? 'checked' : ''} style="width:16px;height:16px;accent-color:var(--gold);">
+        <span id="toggleLabel-${item.key}" style="font-size:0.75rem;font-family:var(--font-mono);color:${status[item.key] ? 'var(--green)' : 'var(--red)'}">
+          ${status[item.key] ? 'enabled' : 'disabled'}
         </span>
       </label>
     </div>
   `).join('');
 
-  // Update labels on toggle
+  // Update labels on toggle + handle auto-approve live
   document.querySelectorAll('#platformStatus input[type=checkbox]').forEach(cb => {
     cb.addEventListener('change', () => {
-      const lbl = document.getElementById('toggleLabel-' + cb.id.replace('toggle-', ''));
+      const key = cb.id.replace('toggle-', '');
+      const lbl = document.getElementById('toggleLabel-' + key);
       if (lbl) { lbl.textContent = cb.checked ? 'enabled' : 'disabled'; lbl.style.color = cb.checked ? 'var(--green)' : 'var(--red)'; }
+      if (key === 'auto_approve_unlocks') {
+        autoApproveEnabled = cb.checked;
+        cb.checked ? startAutoApproveLoop() : stopAutoApproveLoop();
+      }
     });
   });
+
+  // Sync global flag with saved setting
+  autoApproveEnabled = !!(status['auto_approve_unlocks']);
+  autoApproveEnabled ? startAutoApproveLoop() : stopAutoApproveLoop();
 }
 
 async function saveSettings() {
@@ -1066,13 +1156,19 @@ async function saveSettings() {
     tier4: document.getElementById('fee4')?.value,
     tier5: document.getElementById('fee5')?.value,
   };
-  const keys = ['registrations_open', 'unlocks_enabled', 'mpesa_enabled', 'paypal_enabled', 'scraper_enabled', 'job_posting_enabled'];
+  const keys = ['registrations_open', 'unlocks_enabled', 'auto_approve_unlocks', 'mpesa_enabled', 'paypal_enabled', 'scraper_enabled', 'job_posting_enabled'];
   const status = {};
   keys.forEach(k => { const el = document.getElementById('toggle-' + k); if (el) status[k] = el.checked; });
 
   const res = await apiFetch('/admin/settings', { method: 'POST', body: JSON.stringify({ fees, status }) });
-  if (res?.success || res?.message) toast('Settings saved!', 'success');
-  else toast(res?.error || 'Could not save settings', 'error');
+  if (res?.success || res?.message) {
+    toast('Settings saved!', 'success');
+    // Apply auto-approve change immediately
+    autoApproveEnabled = !!(status['auto_approve_unlocks']);
+    autoApproveEnabled ? startAutoApproveLoop() : stopAutoApproveLoop();
+  } else {
+    toast(res?.error || 'Could not save settings', 'error');
+  }
 }
 
 async function changeAdminPassword() {
@@ -1091,6 +1187,116 @@ async function changeAdminPassword() {
   } else {
     toast(res?.error || 'Could not update password', 'error');
   }
+}
+
+// ── AUTO-APPROVE ENGINE ──
+async function initAutoApprove() {
+  // Fetch current setting from API to know if auto-approve is on
+  const data = await apiFetch('/admin/settings');
+  autoApproveEnabled = !!(data?.status?.auto_approve_unlocks);
+  updateAutoApproveBadge();
+  if (autoApproveEnabled) startAutoApproveLoop();
+}
+
+function startAutoApproveLoop() {
+  if (autoApproveInterval) clearInterval(autoApproveInterval);
+  updateAutoApproveBadge();
+  autoProcessPendingApprovals(); // run immediately
+  autoApproveInterval = setInterval(autoProcessPendingApprovals, 60000); // then every 60s
+}
+
+function stopAutoApproveLoop() {
+  if (autoApproveInterval) { clearInterval(autoApproveInterval); autoApproveInterval = null; }
+  updateAutoApproveBadge();
+}
+
+function updateAutoApproveBadge() {
+  const badge = document.getElementById('autoApproveBadge');
+  const log   = document.getElementById('autoApproveLog');
+  if (badge) badge.style.display = autoApproveEnabled ? 'flex' : 'none';
+  if (log)   log.style.display   = autoApproveEnabled ? 'block' : 'none';
+}
+
+function appendAutoApproveLog(msg) {
+  const log = document.getElementById('autoApproveLog');
+  if (!log) return;
+  const time = new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  log.innerHTML = `<span style="color:var(--green)">[${time}]</span> ${msg}<br>` + log.innerHTML;
+}
+
+async function autoProcessPendingApprovals(manual = false) {
+  if (!autoApproveEnabled && !manual) return;
+
+  // Ensure jobs are loaded
+  if (!allJobs.length) {
+    const jobData = await apiFetch('/admin/jobs');
+    if (jobData) allJobs = jobData;
+  }
+
+  const data = await apiFetch('/admin/unlocks');
+  if (!data) return;
+  allApprovals = data;
+
+  const pending = data.filter(a => a.status === 'pending_approval');
+  if (!pending.length) {
+    if (manual) toast('No pending approvals to process', 'success');
+    appendAutoApproveLog('Checked — no pending approvals.');
+    updatePendingBadge(0);
+    return;
+  }
+
+  appendAutoApproveLog(`Found ${pending.length} pending — processing...`);
+  let processed = 0, skipped = 0;
+
+  for (const approval of pending) {
+    // Resolve job details: cached → fresh API
+    let job = approval.job_id ? allJobs.find(j => j.id === approval.job_id) : null;
+    if (!job && approval.job_id) {
+      job = await apiFetch(`/admin/jobs/${approval.job_id}`);
+      if (job) allJobs.push(job); // cache it
+    }
+
+    const jobUrl = approval.job_url || job?.apply_url || job?.job_url || '';
+    if (!jobUrl) {
+      appendAutoApproveLog(`⚠ Skipped #${approval.id} (${escHtml(approval.job_title || 'Unknown')}) — no apply URL on job.`);
+      skipped++;
+      continue;
+    }
+
+    const payload = {
+      jobUrl,
+      jobTitle:       job?.title       || approval.job_title || '',
+      company:        job?.company      || approval.company   || '',
+      jobDescription: job?.description  || '',
+      payMin:         job?.pay_min      || '',
+      payMax:         job?.pay_max      || '',
+      auto:           true
+    };
+
+    const res = await apiFetch(`/admin/unlocks/${approval.id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    if (res?.success || res?.message) {
+      processed++;
+      appendAutoApproveLog(`✅ Auto-approved #${approval.id} → ${escHtml(approval.user_email || 'writer')} — "${escHtml(approval.job_title || '')}"`);
+    } else {
+      appendAutoApproveLog(`✕ Failed #${approval.id}: ${res?.error || 'server error'}`);
+    }
+  }
+
+  if (processed > 0) {
+    toast(`⚡ Auto-approved ${processed} unlock${processed > 1 ? 's' : ''} — emails sent!`, 'success');
+    loadStats();
+  }
+  if (skipped > 0 && manual) {
+    toast(`${skipped} skipped — no apply URL found on those jobs`, 'error');
+  }
+
+  // Refresh approvals list
+  const fresh = await apiFetch('/admin/unlocks');
+  if (fresh) { allApprovals = fresh; renderApprovals(currentApprovalFilter); updatePendingBadge(fresh.filter(a => a.status === 'pending_approval').length); }
 }
 
 // ── MODALS ──
