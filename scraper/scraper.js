@@ -1171,9 +1171,9 @@ async function runAllScrapers() {
   total += await scrapeAuthenticJobs();
   total += await scrapeWorkew();
   total += await scrapeMediaBistro();
-  total += await scrapeRemoteCo();
-  total += await scrapeJournalismJobs();
-  total += await scrapeBloggingPro();
+  // total += await scrapeRemoteCo();       // 404
+  // total += await scrapeJournalismJobs(); // 404
+  // total += await scrapeBloggingPro();    // 403
   total += await scrapeArbeitnow();
   total += await scrapeAdzuna();
   total += await scrapeReed();
