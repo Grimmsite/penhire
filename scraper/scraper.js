@@ -39,7 +39,7 @@ const WRITING_KEYWORDS = [
   'technical writ', 'seo', 'social media', 'communications',
   'marketing writ', 'creative writ', 'script', 'proofreader',
   // Academic writing
-  'academic writ', 'research writ', 'grant writ', 'science writ',
+  'academic writ', 'research', 'grant', 'science writ', 'communicat',
   'scientific writ', 'medical writ', 'scholarly', 'dissertation',
   'academic editor', 'journal editor', 'scientific editor',
   'research communicat', 'science communicat', 'academic communicat',
@@ -162,11 +162,11 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 async function scrapeRemotive() {
   const start = Date.now();
   let found = 0, added = 0;
-  const categories = ['writing', 'marketing', 'copywriting', 'research', 'education'];
+  const categories = ['writing', 'marketing', 'copywriting', 'research', 'education', 'content-writing', 'technical-writing', 'editing', 'journalism', 'communications', 'publishing', 'media'];
   for (const cat of categories) {
     try {
       const res = await axios.get('https://remotive.com/api/remote-jobs', {
-        params: { category: cat, limit: 20 },
+        params: { category: cat, limit: 50 },
         headers: JSON_HEADERS,
         timeout: 15000
       });
@@ -205,11 +205,11 @@ async function scrapeRemotive() {
 async function scrapeJobicy() {
   const start = Date.now();
   let found = 0, added = 0;
-  const tags = ['writing', 'content', 'copywriting', 'blogging', 'editing', 'research', 'academic', 'grant'];
+  const tags = ['writing', 'content', 'copywriting', 'blogging', 'editing', 'research', 'academic', 'grant', 'technical-writing', 'journalism', 'proofreading', 'ghostwriting', 'communications', 'publishing', 'seo', 'social-media', 'marketing', 'newsletter', 'scriptwriting', 'ux-writing', 'science-writing', 'medical-writing', 'creative-writing'];
   for (const tag of tags) {
     try {
       const res = await axios.get('https://jobicy.com/api/v2/remote-jobs', {
-        params: { tag, count: 20 },
+        params: { tag, count: 50 },
         headers: JSON_HEADERS,
         timeout: 15000
       });
