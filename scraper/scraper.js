@@ -7,6 +7,7 @@ const cheerio = require('cheerio');
 const { run, get, all } = require('../config/database');
 const { v4: uuidv4 }   = require('uuid');
 require('dotenv').config();
+function getUA() { return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'; }
 
 // ── FULL BROWSER HEADERS (fixes most 403 blocks) ──
 const HEADERS = {
