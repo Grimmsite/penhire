@@ -1,6 +1,6 @@
 // scraper/scraper.js
-// PenHire Auto Job Scraper — 8 sources, writing-focused
-// Runs every 2 hours via cron in server.js
+// PenHire Auto Job Scraper — Fixed version
+// Changes: better headers to fix 403s, new working sources, fixed WeWorkRemotely selector
 
 const axios   = require('axios');
 const cheerio = require('cheerio');
@@ -8,12 +8,33 @@ const { run, get, all } = require('../config/database');
 const { v4: uuidv4 }   = require('uuid');
 require('dotenv').config();
 
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+// ── FULL BROWSER HEADERS (fixes most 403 blocks) ──
+const HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Upgrade-Insecure-Requests': '1',
+  'Connection': 'keep-alive'
+};
 
-// ── WRITING KEYWORDS (broad filter) ──
+const JSON_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Cache-Control': 'no-cache',
+  'Referer': 'https://www.google.com/'
+};
+
+// ── WRITING KEYWORDS ──
 const WRITING_KEYWORDS = [
   'writ', 'content', 'copy', 'editor', 'editorial', 'blog', 'article',
-  'journalist', 'journalist', 'reporter', 'author', 'ghostwrit',
+  'journalist', 'reporter', 'author', 'ghostwrit',
   'technical writ', 'seo', 'social media', 'communications',
   'marketing writ', 'creative writ', 'script', 'proofreader'
 ];
@@ -32,7 +53,7 @@ function calculateFees(payMax) {
   return                              { unlock_kes: 6000, unlock_usd: 48.00, post_fee_usd: 40 };
 }
 
-// ── PARSE PAY FROM TEXT ──
+// ── PARSE PAY ──
 function parsePay(text) {
   if (!text) return { pay_min: 20, pay_max: 60 };
   const nums = String(text).replace(/[,$€£k]/gi, (m) => m.toLowerCase() === 'k' ? '000' : '')
@@ -51,7 +72,6 @@ function detectCategory(title, desc = '') {
   if (t.match(/academic|research|essay|thesis|dissertation/))                       return 'academic';
   if (t.match(/social media|instagram|facebook|twitter|tiktok|linkedin/))           return 'social';
   if (t.match(/copy|sales|email marketing|ad copy|landing page|conversion/))        return 'copywriting';
-  if (t.match(/seo|blog|article|content writ|web content/))                         return 'blog';
   return 'blog';
 }
 
@@ -73,17 +93,13 @@ function extractTags(title, desc = '') {
 function insertJob(job) {
   try {
     if (!job.title || !job.company) return false;
-
-    // Deduplicate by source URL or title+company
     const existing = get(
       'SELECT id FROM jobs WHERE source_url = ? OR (title = ? AND company = ?)',
       [job.source_url || '', job.title, job.company]
     );
     if (existing) return false;
-
     const fees = calculateFees(job.pay_max);
     const tags = extractTags(job.title, job.description);
-
     run(`
       INSERT INTO jobs
       (uuid, title, company, country, category, pay_min, pay_max, pay_type,
@@ -97,7 +113,7 @@ function insertJob(job) {
       job.company.slice(0, 100),
       job.country || 'Remote',
       detectCategory(job.title, job.description),
-      job.pay_min || fees.unlock_kes / 10,
+      job.pay_min || 20,
       job.pay_max || 60,
       job.pay_type || 'Per Project',
       (job.description || job.title).slice(0, 3000),
@@ -118,7 +134,6 @@ function insertJob(job) {
   }
 }
 
-// ── LOG ──
 function logScrape(source, found, added, status, error, duration) {
   try {
     run('INSERT INTO scrape_log (source, jobs_found, jobs_added, status, error, duration_ms) VALUES (?,?,?,?,?,?)',
@@ -126,70 +141,69 @@ function logScrape(source, found, added, status, error, duration) {
   } catch (e) {}
 }
 
-// ── EXPIRE OLD JOBS ──
 function expireOldJobs() {
   try {
     run("UPDATE jobs SET is_active = 0 WHERE expires_at < datetime('now') AND is_active = 1");
   } catch (e) {}
 }
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
 // ══════════════════════════════════════════
-// SOURCE 1: Himalayas (FREE JSON API — best source)
-// Searches multiple writing keywords
+// SOURCE 1: Remotive (FREE JSON API — very reliable)
 // ══════════════════════════════════════════
-async function scrapeHimalayas() {
+async function scrapeRemotive() {
   const start = Date.now();
   let found = 0, added = 0;
-  const keywords = ['writer', 'content writer', 'copywriter', 'technical writer', 'editor', 'blog writer'];
-
-  for (const kw of keywords) {
+  const categories = ['writing', 'marketing', 'copywriting'];
+  for (const cat of categories) {
     try {
-      const res = await axios.get('https://himalayas.app/jobs/api/search', {
-        params: { q: kw, employment_type: 'Full Time,Part Time,Contractor', limit: 20 },
-        headers: { 'User-Agent': UA, 'Accept': 'application/json' },
+      const res = await axios.get('https://remotive.com/api/remote-jobs', {
+        params: { category: cat, limit: 20 },
+        headers: JSON_HEADERS,
         timeout: 15000
       });
       const jobs = res.data?.jobs || [];
       for (const j of jobs) {
         found++;
         const desc = (j.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        const pay  = parsePay(j.salaryMin ? `${j.salaryMin}-${j.salaryMax}` : '');
+        if (!isWritingJob(j.title, desc)) continue;
+        const pay = parsePay(j.salary || '');
         if (insertJob({
           title:       j.title,
-          company:     j.companyName || 'Remote Company',
-          country:     j.locationRestrictions?.[0] || 'Remote',
+          company:     j.company_name || 'Remote Company',
+          country:     j.candidate_required_location || 'Worldwide',
           pay_min:     pay.pay_min,
           pay_max:     pay.pay_max,
-          pay_type:    j.employmentType || 'Full Time',
+          pay_type:    j.job_type || 'Full Time',
           description: desc.slice(0, 2000) || j.title,
-          apply_url:   j.applicationLink || j.url || '',
-          source:      'himalayas',
-          source_url:  j.url || j.applicationLink || ''
+          apply_url:   j.url || '',
+          source:      'remotive',
+          source_url:  j.url || ''
         })) added++;
       }
-      await sleep(500); // be polite to their API
+      await sleep(500);
     } catch (err) {
-      console.error(`  Himalayas [${kw}] error:`, err.message);
+      console.error(`  Remotive [${cat}] error:`, err.message);
     }
   }
-  logScrape('himalayas', found, added, 'success', '', Date.now() - start);
-  console.log(`  ✅ Himalayas: ${added}/${found} jobs added`);
+  logScrape('remotive', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Remotive: ${added}/${found} jobs added`);
   return added;
 }
 
 // ══════════════════════════════════════════
-// SOURCE 2: Jobicy (JSON API — multiple writing tags)
+// SOURCE 2: Jobicy (JSON API)
 // ══════════════════════════════════════════
 async function scrapeJobicy() {
   const start = Date.now();
   let found = 0, added = 0;
   const tags = ['writing', 'content', 'copywriting', 'blogging', 'editing'];
-
   for (const tag of tags) {
     try {
-      const res = await axios.get(`https://jobicy.com/api/v2/remote-jobs`, {
+      const res = await axios.get('https://jobicy.com/api/v2/remote-jobs', {
         params: { tag, count: 20 },
-        headers: { 'User-Agent': UA, 'Accept': 'application/json' },
+        headers: JSON_HEADERS,
         timeout: 15000
       });
       const jobs = res.data?.jobs || [];
@@ -222,93 +236,62 @@ async function scrapeJobicy() {
 }
 
 // ══════════════════════════════════════════
-// SOURCE 3: RemoteOK (JSON API)
+// SOURCE 3: WeWorkRemotely (fixed selector)
 // ══════════════════════════════════════════
-async function scrapeRemoteOK() {
+async function scrapeWeWorkRemotely() {
   const start = Date.now();
   let found = 0, added = 0;
-  const tags = ['writing', 'content', 'copywriting', 'marketing'];
-
-  for (const tag of tags) {
+  const cats = [
+    'remote-copywriting-jobs',
+    'remote-marketing-jobs',
+    'remote-writing-jobs'
+  ];
+  for (const cat of cats) {
     try {
-      const res = await axios.get(`https://remoteok.com/api?tag=${tag}`, {
-        headers: { 'User-Agent': UA, 'Accept': 'application/json' },
-        timeout: 15000
+      const res = await axios.get(`https://weworkremotely.com/categories/${cat}`, {
+        headers: { ...HEADERS, 'Referer': 'https://weworkremotely.com/' },
+        timeout: 20000
       });
-      const jobs = (res.data || []).filter(j => j.position);
-      for (const j of jobs.slice(0, 15)) {
+      const $ = cheerio.load(res.data);
+      // Try multiple selectors — WWR changes their HTML occasionally
+      const items = $('li.feature, section.jobs li, ul.jobs li').filter((i, el) => {
+        return $(el).find('a').attr('href')?.includes('/remote-jobs/');
+      });
+      items.each((i, el) => {
+        if (i >= 15) return false;
         found++;
-        const desc = (j.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        if (!isWritingJob(j.position, desc)) continue;
-        const pay = parsePay(j.salary || '');
+        const title   = $(el).find('.title, span.title, .position').text().trim() ||
+                        $(el).find('a').first().text().trim();
+        const company = $(el).find('.company, span.company, .company-name').text().trim() || 'Remote Company';
+        const href    = $(el).find('a').attr('href') || '';
+        const url     = href.startsWith('http') ? href : `https://weworkremotely.com${href}`;
+        if (!title || title.length < 3) return;
         if (insertJob({
-          title:       j.position,
-          company:     j.company || 'Remote Company',
-          country:     j.location || 'Remote',
-          pay_min:     pay.pay_min,
-          pay_max:     pay.pay_max,
-          pay_type:    'Full Time',
-          description: desc.slice(0, 2000) || j.position,
-          apply_url:   j.url || `https://remoteok.com/l/${j.id}`,
-          source:      'remoteok',
-          source_url:  j.url || `https://remoteok.com/l/${j.id}`
+          title, company, country: 'Remote',
+          pay_min: 30, pay_max: 100, pay_type: 'Per Month',
+          description: `${title} at ${company}. Remote writing position. Visit the job link for full details and application instructions.`,
+          apply_url: url, source: 'weworkremotely', source_url: url
         })) added++;
-      }
-      await sleep(1000); // RemoteOK is strict about rate limits
+      });
+      await sleep(1500);
     } catch (err) {
-      console.error(`  RemoteOK [${tag}] error:`, err.message);
+      console.error(`  WWR [${cat}] error:`, err.message);
     }
   }
-  logScrape('remoteok', found, added, 'success', '', Date.now() - start);
-  console.log(`  ✅ RemoteOK: ${added}/${found} jobs added`);
+  logScrape('weworkremotely', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ WeWorkRemotely: ${added}/${found} jobs added`);
   return added;
 }
 
 // ══════════════════════════════════════════
-// SOURCE 4: Himalayas RSS Feed (100 latest jobs)
-// ══════════════════════════════════════════
-async function scrapeHimalayasRSS() {
-  const start = Date.now();
-  let found = 0, added = 0;
-  try {
-    const res = await axios.get('https://himalayas.app/jobs/rss', {
-      headers: { 'User-Agent': UA },
-      timeout: 15000
-    });
-    const $ = cheerio.load(res.data, { xmlMode: true });
-    $('item').each((i, el) => {
-      found++;
-      const title   = $(el).find('title').text().trim();
-      const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
-      const url     = $(el).find('link').text().trim();
-      const company = $(el).find('companyName').text().trim() ||
-                      $(el).find('[localName="companyName"]').text().trim() || 'Remote Company';
-      if (!isWritingJob(title, desc)) return;
-      const pay = parsePay(desc);
-      if (insertJob({
-        title, company, country: 'Remote',
-        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
-        description: desc.slice(0, 2000) || title,
-        apply_url: url, source: 'himalayas_rss', source_url: url
-      })) added++;
-    });
-  } catch (err) {
-    console.error('  HimalayasRSS error:', err.message);
-  }
-  logScrape('himalayas_rss', found, added, 'success', '', Date.now() - start);
-  console.log(`  ✅ Himalayas RSS: ${added}/${found} writing jobs added`);
-  return added;
-}
-
-// ══════════════════════════════════════════
-// SOURCE 5: ProBlogger RSS
+// SOURCE 4: ProBlogger RSS
 // ══════════════════════════════════════════
 async function scrapeProBlogger() {
   const start = Date.now();
   let found = 0, added = 0;
   try {
     const res = await axios.get('https://problogger.com/jobs/feed/', {
-      headers: { 'User-Agent': UA },
+      headers: HEADERS,
       timeout: 15000
     });
     const $ = cheerio.load(res.data, { xmlMode: true });
@@ -335,106 +318,15 @@ async function scrapeProBlogger() {
 }
 
 // ══════════════════════════════════════════
-// SOURCE 6: WeWorkRemotely (HTML scraper)
-// Multiple writing categories
-// ══════════════════════════════════════════
-async function scrapeWeWorkRemotely() {
-  const start = Date.now();
-  let found = 0, added = 0;
-  const cats = [
-    'remote-copywriting-jobs',
-    'remote-marketing-jobs',
-    'remote-writing-jobs'
-  ];
-
-  for (const cat of cats) {
-    try {
-      const res = await axios.get(`https://weworkremotely.com/categories/${cat}`, {
-        headers: { 'User-Agent': UA, 'Accept': 'text/html' },
-        timeout: 15000
-      });
-      const $ = cheerio.load(res.data);
-      $('section.jobs article').each((i, el) => {
-        if (i >= 10) return false;
-        found++;
-        const title   = $(el).find('.title').text().trim();
-        const company = $(el).find('.company').text().trim() || 'Remote Company';
-        const region  = $(el).find('.region').text().trim() || 'Remote';
-        const href    = $(el).find('a').attr('href');
-        const url     = href ? `https://weworkremotely.com${href}` : '';
-        if (!title) return;
-        if (insertJob({
-          title, company, country: region,
-          pay_min: 30, pay_max: 100, pay_type: 'Per Month',
-          description: `${title} at ${company}. Remote position. Visit job link for full details.`,
-          apply_url: url, source: 'weworkremotely', source_url: url
-        })) added++;
-      });
-      await sleep(1000);
-    } catch (err) {
-      console.error(`  WWR [${cat}] error:`, err.message);
-    }
-  }
-  logScrape('weworkremotely', found, added, 'success', '', Date.now() - start);
-  console.log(`  ✅ WeWorkRemotely: ${added}/${found} jobs added`);
-  return added;
-}
-
-// ══════════════════════════════════════════
-// SOURCE 7: Freelancer RSS (3 writing feeds)
-// ══════════════════════════════════════════
-async function scrapeFreelancer() {
-  const start = Date.now();
-  let found = 0, added = 0;
-  const feeds = [
-    'https://www.freelancer.com/rss/jobsrss.xml?skill=article-writing',
-    'https://www.freelancer.com/rss/jobsrss.xml?skill=copywriting',
-    'https://www.freelancer.com/rss/jobsrss.xml?skill=content-writing',
-    'https://www.freelancer.com/rss/jobsrss.xml?skill=blog-writing',
-    'https://www.freelancer.com/rss/jobsrss.xml?skill=technical-writing'
-  ];
-
-  for (const feed of feeds) {
-    try {
-      const res = await axios.get(feed, {
-        headers: { 'User-Agent': UA },
-        timeout: 12000
-      });
-      const $ = cheerio.load(res.data, { xmlMode: true });
-      $('item').each((i, el) => {
-        if (i >= 8) return false;
-        found++;
-        const title = $(el).find('title').text().trim();
-        const desc  = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
-        const url   = $(el).find('link').text().trim();
-        const pay   = parsePay(desc);
-        if (insertJob({
-          title, company: 'Freelancer Client', country: 'Remote',
-          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Per Project',
-          description: desc.slice(0, 1500) || title,
-          apply_url: url, source: 'freelancer', source_url: url
-        })) added++;
-      });
-      await sleep(500);
-    } catch (err) {
-      console.error('  Freelancer RSS error:', err.message);
-    }
-  }
-  logScrape('freelancer', found, added, 'success', '', Date.now() - start);
-  console.log(`  ✅ Freelancer: ${added}/${found} jobs added`);
-  return added;
-}
-
-// ══════════════════════════════════════════
-// SOURCE 8: Authentic Jobs RSS
+// SOURCE 5: AuthenticJobs RSS
 // ══════════════════════════════════════════
 async function scrapeAuthenticJobs() {
   const start = Date.now();
   let found = 0, added = 0;
   try {
     const res = await axios.get('https://authenticjobs.com/feed/', {
-      headers: { 'User-Agent': UA },
-      timeout: 12000
+      headers: HEADERS,
+      timeout: 15000
     });
     const $ = cheerio.load(res.data, { xmlMode: true });
     $('item').each((i, el) => {
@@ -461,15 +353,15 @@ async function scrapeAuthenticJobs() {
 }
 
 // ══════════════════════════════════════════
-// SOURCE 9: Workew RSS (remote jobs)
+// SOURCE 6: Workew RSS
 // ══════════════════════════════════════════
 async function scrapeWorkew() {
   const start = Date.now();
   let found = 0, added = 0;
   try {
     const res = await axios.get('https://workew.com/feed/', {
-      headers: { 'User-Agent': UA },
-      timeout: 12000
+      headers: HEADERS,
+      timeout: 15000
     });
     const $ = cheerio.load(res.data, { xmlMode: true });
     $('item').each((i, el) => {
@@ -495,14 +387,135 @@ async function scrapeWorkew() {
   return added;
 }
 
-// ── NEW SCRAPER: Journalism Jobs ──
+// ══════════════════════════════════════════
+// SOURCE 7: MediaBistro RSS (fixed URL)
+// ══════════════════════════════════════════
+async function scrapeMediaBistro() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const urls = [
+    'https://www.mediabistro.com/jobs/rss/',
+    'https://www.mediabistro.com/feed/'
+  ];
+  for (const feedUrl of urls) {
+    try {
+      const res = await axios.get(feedUrl, { headers: HEADERS, timeout: 15000 });
+      const $ = cheerio.load(res.data, { xmlMode: true });
+      $('item').each((i, el) => {
+        if (i >= 20) return false;
+        const title   = $(el).find('title').text().trim();
+        const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
+        const url     = $(el).find('link').text().trim();
+        const company = $(el).find('company').text().trim() || 'Remote Employer';
+        if (!isWritingJob(title, desc)) return;
+        found++;
+        const pay = parsePay(desc);
+        if (insertJob({
+          title, company, country: 'Remote',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Per Article',
+          description: desc.slice(0, 2000) || title,
+          apply_url: url, source: 'mediabistro', source_url: url
+        })) added++;
+      });
+      if (found > 0) break;
+    } catch (err) {
+      console.error('  MediaBistro error:', err.message);
+    }
+  }
+  logScrape('mediabistro', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ MediaBistro: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// SOURCE 8: Remote.co (fixed URL + longer timeout)
+// ══════════════════════════════════════════
+async function scrapeRemoteCo() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const feeds = [
+    'https://remote.co/remote-jobs/writer/feed/',
+    'https://remote.co/remote-jobs/content/feed/'
+  ];
+  for (const feedUrl of feeds) {
+    try {
+      const res = await axios.get(feedUrl, { headers: HEADERS, timeout: 25000 });
+      const $ = cheerio.load(res.data, { xmlMode: true });
+      $('item').each((i, el) => {
+        if (i >= 20) return false;
+        const title   = $(el).find('title').text().trim();
+        const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
+        const url     = $(el).find('link').text().trim();
+        const company = $(el).find('creator').text().trim() || 'Remote Employer';
+        if (!isWritingJob(title, desc)) return;
+        found++;
+        const pay = parsePay(desc);
+        if (insertJob({
+          title, company, country: 'Remote',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+          description: desc.slice(0, 2000) || title,
+          apply_url: url, source: 'remoteco', source_url: url
+        })) added++;
+      });
+      await sleep(1000);
+    } catch (err) {
+      console.error('  Remote.co error:', err.message);
+    }
+  }
+  logScrape('remoteco', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Remote.co: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// SOURCE 9: JournalismJobs (fixed URL)
+// ══════════════════════════════════════════
 async function scrapeJournalismJobs() {
   const start = Date.now();
   let found = 0, added = 0;
+  const feeds = [
+    'https://www.journalismjobs.com/feed',
+    'https://www.journalismjobs.com/rss.php'
+  ];
+  for (const feedUrl of feeds) {
+    try {
+      const res = await axios.get(feedUrl, { headers: HEADERS, timeout: 15000 });
+      const $ = cheerio.load(res.data, { xmlMode: true });
+      $('item').each((i, el) => {
+        if (i >= 20) return false;
+        const title = $(el).find('title').text().trim();
+        const desc  = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
+        const url   = $(el).find('link').text().trim();
+        if (!isWritingJob(title, desc)) return;
+        found++;
+        const pay = parsePay(desc);
+        if (insertJob({
+          title, company: 'Media Employer', country: 'Remote',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+          description: desc.slice(0, 2000) || title,
+          apply_url: url, source: 'journalismjobs', source_url: url
+        })) added++;
+      });
+      if (found > 0) break;
+    } catch (err) {
+      console.error('  JournalismJobs error:', err.message);
+    }
+  }
+  logScrape('journalismjobs', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ JournalismJobs: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// SOURCE 10: BloggingPro RSS (new — writing only)
+// ══════════════════════════════════════════
+async function scrapeBloggingPro() {
+  const start = Date.now();
+  let found = 0, added = 0;
   try {
-    const res = await axios.get('https://www.journalismjobs.com/rss', {
-      headers: { 'User-Agent': UA },
-      timeout: 12000
+    const res = await axios.get('https://www.bloggingpro.com/feed/', {
+      headers: HEADERS,
+      timeout: 15000
     });
     const $ = cheerio.load(res.data, { xmlMode: true });
     $('item').each((i, el) => {
@@ -514,90 +527,100 @@ async function scrapeJournalismJobs() {
       found++;
       const pay = parsePay(desc);
       if (insertJob({
-        title, company: 'Remote Employer', country: 'Remote',
-        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'per article',
+        title, company: 'Blog Employer', country: 'Remote',
+        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Per Article',
         description: desc.slice(0, 2000) || title,
-        apply_url: url, source: 'journalismjobs', source_url: url
+        apply_url: url, source: 'bloggingpro', source_url: url
       })) added++;
     });
   } catch (err) {
-    console.error('  JournalismJobs error:', err.message);
+    console.error('  BloggingPro error:', err.message);
   }
-  logScrape('journalismjobs', found, added, 'success', '', Date.now() - start);
-  console.log(`  ✅ JournalismJobs: ${added}/${found} jobs added`);
+  logScrape('bloggingpro', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ BloggingPro: ${added}/${found} jobs added`);
   return added;
 }
 
-// ── NEW SCRAPER: Remote.co ──
-async function scrapeRemoteCo() {
+// ══════════════════════════════════════════
+// SOURCE 11: Himalayas JSON API (with better headers)
+// ══════════════════════════════════════════
+async function scrapeHimalayas() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const keywords = ['writer', 'content writer', 'copywriter', 'technical writer', 'editor', 'blog writer'];
+  for (const kw of keywords) {
+    try {
+      const res = await axios.get('https://himalayas.app/jobs/api/search', {
+        params: { q: kw, limit: 20 },
+        headers: { ...JSON_HEADERS, 'Referer': 'https://himalayas.app/' },
+        timeout: 15000
+      });
+      const jobs = res.data?.jobs || [];
+      for (const j of jobs) {
+        found++;
+        const desc = (j.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const pay  = parsePay(j.salaryMin ? `${j.salaryMin}-${j.salaryMax}` : '');
+        if (insertJob({
+          title:       j.title,
+          company:     j.companyName || 'Remote Company',
+          country:     j.locationRestrictions?.[0] || 'Remote',
+          pay_min:     pay.pay_min,
+          pay_max:     pay.pay_max,
+          pay_type:    j.employmentType || 'Full Time',
+          description: desc.slice(0, 2000) || j.title,
+          apply_url:   j.applicationLink || j.url || '',
+          source:      'himalayas',
+          source_url:  j.url || j.applicationLink || ''
+        })) added++;
+      }
+      await sleep(800);
+    } catch (err) {
+      console.error(`  Himalayas [${kw}] error:`, err.message);
+    }
+  }
+  logScrape('himalayas', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Himalayas: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// SOURCE 12: RemoteOK (with better headers + delay)
+// ══════════════════════════════════════════
+async function scrapeRemoteOK() {
   const start = Date.now();
   let found = 0, added = 0;
   try {
-    const res = await axios.get('https://remote.co/remote-jobs/writer/feed/', {
-      headers: { 'User-Agent': UA },
-      timeout: 12000
+    await sleep(2000); // RemoteOK needs a pause before request
+    const res = await axios.get('https://remoteok.com/api', {
+      headers: { ...JSON_HEADERS, 'Referer': 'https://remoteok.com/' },
+      timeout: 20000
     });
-    const $ = cheerio.load(res.data, { xmlMode: true });
-    $('item').each((i, el) => {
-      if (i >= 20) return false;
-      const title   = $(el).find('title').text().trim();
-      const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
-      const url     = $(el).find('link').text().trim();
-      const company = $(el).find('creator').text().trim() || 'Remote Employer';
-      if (!isWritingJob(title, desc)) return;
+    const jobs = (res.data || []).filter(j => j.position);
+    for (const j of jobs.slice(0, 50)) {
+      const desc = (j.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!isWritingJob(j.position, desc)) continue;
       found++;
-      const pay = parsePay(desc);
+      const pay = parsePay(j.salary || '');
       if (insertJob({
-        title, company, country: 'Remote',
-        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'per article',
-        description: desc.slice(0, 2000) || title,
-        apply_url: url, source: 'remoteco', source_url: url
+        title:       j.position,
+        company:     j.company || 'Remote Company',
+        country:     j.location || 'Remote',
+        pay_min:     pay.pay_min,
+        pay_max:     pay.pay_max,
+        pay_type:    'Full Time',
+        description: desc.slice(0, 2000) || j.position,
+        apply_url:   j.url || `https://remoteok.com/l/${j.id}`,
+        source:      'remoteok',
+        source_url:  j.url || `https://remoteok.com/l/${j.id}`
       })) added++;
-    });
+    }
   } catch (err) {
-    console.error('  Remote.co error:', err.message);
+    console.error('  RemoteOK error:', err.message);
   }
-  logScrape('remoteco', found, added, 'success', '', Date.now() - start);
-  console.log(`  ✅ Remote.co: ${added}/${found} jobs added`);
+  logScrape('remoteok', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ RemoteOK: ${added}/${found} jobs added`);
   return added;
 }
-
-// ── NEW SCRAPER: MediaBistro ──
-async function scrapeMediaBistro() {
-  const start = Date.now();
-  let found = 0, added = 0;
-  try {
-    const res = await axios.get('https://www.mediabistro.com/jobs/rss/', {
-      headers: { 'User-Agent': UA },
-      timeout: 12000
-    });
-    const $ = cheerio.load(res.data, { xmlMode: true });
-    $('item').each((i, el) => {
-      if (i >= 20) return false;
-      const title   = $(el).find('title').text().trim();
-      const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
-      const url     = $(el).find('link').text().trim();
-      const company = $(el).find('company').text().trim() || 'Remote Employer';
-      if (!isWritingJob(title, desc)) return;
-      found++;
-      const pay = parsePay(desc);
-      if (insertJob({
-        title, company, country: 'Remote',
-        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'per article',
-        description: desc.slice(0, 2000) || title,
-        apply_url: url, source: 'mediabistro', source_url: url
-      })) added++;
-    });
-  } catch (err) {
-    console.error('  MediaBistro error:', err.message);
-  }
-  logScrape('mediabistro', found, added, 'success', '', Date.now() - start);
-  console.log(`  ✅ MediaBistro: ${added}/${found} jobs added`);
-  return added;
-}
-
-// ── SLEEP HELPER ──
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ══════════════════════════════════════════
 // MAIN — runs all scrapers
@@ -607,18 +630,18 @@ async function runAllScrapers() {
   expireOldJobs();
 
   let total = 0;
-  total += await scrapeHimalayas();
+  total += await scrapeRemotive();       // NEW — very reliable JSON API
   total += await scrapeJobicy();
-  total += await scrapeHimalayasRSS();
+  total += await scrapeWeWorkRemotely(); // fixed selector
   total += await scrapeProBlogger();
-  total += await scrapeWeWorkRemotely();
-  total += await scrapeFreelancer();
-  total += await scrapeRemoteOK();
   total += await scrapeAuthenticJobs();
   total += await scrapeWorkew();
-  total += await scrapeJournalismJobs();
-  total += await scrapeRemoteCo();
-  total += await scrapeMediaBistro();
+  total += await scrapeMediaBistro();    // fixed URL
+  total += await scrapeRemoteCo();       // fixed URL + longer timeout
+  total += await scrapeJournalismJobs(); // fixed URL
+  total += await scrapeBloggingPro();    // NEW
+  total += await scrapeHimalayas();      // better headers
+  total += await scrapeRemoteOK();       // better headers + delay
 
   const activeJobs = get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1');
   console.log(`\n✅ Scrape complete. New jobs this run: ${total}`);
@@ -626,7 +649,6 @@ async function runAllScrapers() {
   return total;
 }
 
-// Run directly if called as script
 if (require.main === module) {
   runAllScrapers().then(() => process.exit(0)).catch(console.error);
 }
