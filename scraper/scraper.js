@@ -978,9 +978,9 @@ async function scrapeChronicleJobs() {
   const start = Date.now();
   let found = 0, added = 0;
   const feeds = [
-    'https://jobs.chronicle.com/jobs/communications-marketing/rss/',
-    'https://jobs.chronicle.com/jobs/writing-editing/rss/',
-    'https://jobs.chronicle.com/jobs/research/rss/'
+    'https://www.academickeys.com/rss/jobs_by_discipline.php?discipline=Communication',
+    'https://www.academickeys.com/rss/jobs_by_discipline.php?discipline=English',
+    'https://www.academickeys.com/rss/jobs_by_discipline.php?discipline=Journalism'
   ];
   for (const feed of feeds) {
     try {
@@ -1065,9 +1065,9 @@ async function scrapeTimesHigherEd() {
   const start = Date.now();
   let found = 0, added = 0;
   const feeds = [
-    'https://www.timeshighereducation.com/unijobs/rss/?JobTypeID=5',  // Communications
-    'https://www.timeshighereducation.com/unijobs/rss/?JobTypeID=13', // Editing/Publishing
-    'https://www.timeshighereducation.com/unijobs/rss/?JobTypeID=10', // Research Support
+    'https://www.timeshighereducation.com/unijobs/rss/1/',  // Communications
+    'https://www.timeshighereducation.com/unijobs/rss/2/', // Editing/Publishing
+    'https://www.timeshighereducation.com/unijobs/rss/3/', // Research Support
   ];
   for (const feed of feeds) {
     try {
@@ -1110,7 +1110,7 @@ async function scrapeEuroScienceJobs() {
   let found = 0, added = 0;
   // EuroScienceJobs provides an open RSS feed covering research positions across Europe
   const feeds = [
-    'https://www.eurosciencejobs.com/rss/',
+    'https://www.eurosciencejobs.com/rss/all/',
     'https://www.natureindex.com/rss/jobs'
   ];
   for (const feed of feeds) {
