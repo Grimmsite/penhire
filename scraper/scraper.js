@@ -1172,6 +1172,10 @@ async function runAllScrapers() {
   total += await scrapeJobsAcUk();
   total += await scrapeGuardianJobs();
   total += await scrapeHigherEdJobs();
+  total += await scrapePhilJobs();
+  total += await scrapeNewScientistJobs();
+  total += await scrapeHNet();
+  total += await scrapeScienceCareers();
   // total += await scrapeIdealist();      // 404
   // total += await scrapeWorkInHigherEd(); // ENOTFOUND
   // total += await scrapeHERCJobs();       // 404   // US — largest academic board
@@ -1309,5 +1313,148 @@ async function scrapeHERCJobs() {
   }
   logScrape('hercjobs', found, added, 'success', '', Date.now() - start);
   console.log(`  ✅ HERC Jobs: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// ACADEMIC: PhilJobs RSS (humanities & social sciences)
+// ══════════════════════════════════════════
+async function scrapePhilJobs() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  try {
+    const res = await axios.get('https://philjobs.org/rss/jobs', {
+      headers: { 'User-Agent': getUA(), 'Accept': 'application/rss+xml, text/xml' },
+      timeout: 15000
+    });
+    const $ = cheerio.load(res.data, { xmlMode: true });
+    $('item').each((i, el) => {
+      if (i >= 25) return false;
+      found++;
+      const title   = $(el).find('title').text().trim();
+      const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      const url     = $(el).find('link').text().trim();
+      const company = $(el).find('dc\\:creator, creator').text().trim() || 'Academic Institution';
+      const pay = parsePay(desc);
+      if (insertJob({
+        title, company, country: 'United States',
+        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+        description: desc.slice(0, 2000) || title,
+        apply_url: url, source: 'philjobs', source_url: url
+      })) added++;
+    });
+  } catch (err) {
+    console.error('  PhilJobs error:', err.message);
+  }
+  logScrape('philjobs', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ PhilJobs: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// ACADEMIC: New Scientist Jobs RSS (science writing & research)
+// ══════════════════════════════════════════
+async function scrapeNewScientistJobs() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  try {
+    const res = await axios.get('https://jobs.newscientist.com/jobs/rss/', {
+      headers: { 'User-Agent': getUA(), 'Accept': 'application/rss+xml, text/xml' },
+      timeout: 15000
+    });
+    const $ = cheerio.load(res.data, { xmlMode: true });
+    $('item').each((i, el) => {
+      if (i >= 25) return false;
+      const title   = $(el).find('title').text().trim();
+      const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      const url     = $(el).find('link').text().trim();
+      const company = $(el).find('dc\\:creator, creator, author').text().trim() || 'Research Institution';
+      if (!isWritingJob(title, desc)) return;
+      found++;
+      const pay = parsePay(desc);
+      if (insertJob({
+        title, company, country: 'United Kingdom',
+        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+        description: desc.slice(0, 2000) || title,
+        apply_url: url, source: 'newscientistjobs', source_url: url
+      })) added++;
+    });
+  } catch (err) {
+    console.error('  New Scientist Jobs error:', err.message);
+  }
+  logScrape('newscientistjobs', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ New Scientist Jobs: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// ACADEMIC: H-Net Job Guide RSS (humanities network — largest humanities job board)
+// ══════════════════════════════════════════
+async function scrapeHNet() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  try {
+    const res = await axios.get('https://www.h-net.org/jobs/rss.php', {
+      headers: { 'User-Agent': getUA(), 'Accept': 'application/rss+xml, text/xml' },
+      timeout: 15000
+    });
+    const $ = cheerio.load(res.data, { xmlMode: true });
+    $('item').each((i, el) => {
+      if (i >= 25) return false;
+      const title   = $(el).find('title').text().trim();
+      const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      const url     = $(el).find('link').text().trim();
+      const company = $(el).find('dc\\:creator, creator').text().trim() || 'Humanities Institution';
+      if (!isWritingJob(title, desc)) return;
+      found++;
+      const pay = parsePay(desc);
+      if (insertJob({
+        title, company, country: 'United States',
+        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+        description: desc.slice(0, 2000) || title,
+        apply_url: url, source: 'hnet', source_url: url
+      })) added++;
+    });
+  } catch (err) {
+    console.error('  H-Net error:', err.message);
+  }
+  logScrape('hnet', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ H-Net Jobs: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// ACADEMIC: Science Careers RSS (AAAS — premier science jobs board)
+// ══════════════════════════════════════════
+async function scrapeScienceCareers() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  try {
+    const res = await axios.get('https://jobs.sciencecareers.org/jobs/rss/', {
+      headers: { 'User-Agent': getUA(), 'Accept': 'application/rss+xml, text/xml' },
+      timeout: 15000
+    });
+    const $ = cheerio.load(res.data, { xmlMode: true });
+    $('item').each((i, el) => {
+      if (i >= 25) return false;
+      const title   = $(el).find('title').text().trim();
+      const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      const url     = $(el).find('link').text().trim();
+      const company = $(el).find('dc\\:creator, creator, author').text().trim() || 'Research Institution';
+      if (!isWritingJob(title, desc)) return;
+      found++;
+      const pay = parsePay(desc);
+      if (insertJob({
+        title, company, country: 'United States',
+        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+        description: desc.slice(0, 2000) || title,
+        apply_url: url, source: 'sciencecareers', source_url: url
+      })) added++;
+    });
+  } catch (err) {
+    console.error('  Science Careers error:', err.message);
+  }
+  logScrape('sciencecareers', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Science Careers: ${added}/${found} jobs added`);
   return added;
 }
