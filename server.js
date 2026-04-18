@@ -648,6 +648,33 @@ async function start() {
     runAllScrapers().catch(console.error);
   }, 10000);
 }
+// Health endpoint (keep-alive)
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
+// Dynamic sitemap
+app.get('/sitemap.xml', (req, res) => {
+  const base = 'https://penhire.onrender.com';
+  const today = new Date().toISOString().split('T')[0];
+  const pages = [
+    { url: '/', priority: '1.0', freq: 'daily' },
+    { url: '/jobs', priority: '0.9', freq: 'hourly' },
+    { url: '/post-job', priority: '0.7', freq: 'monthly' },
+  ];
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${pages.map(p=>`<url><loc>${base}${p.url}</loc><lastmod>${today}</lastmod><changefreq>${p.freq}</changefreq><priority>${p.priority}</priority></url>`).join('')}</urlset>`;
+  res.header('Content-Type', 'application/xml');
+  res.send(xml);
+});
+
+// Keep-alive: ping every 14 min to prevent Render cold starts
+const https = require('https');
+setTimeout(() => {
+  setInterval(() => {
+    https.get('https://penhire.onrender.com/health', r => {
+      console.log('[Keep-alive]', new Date().toISOString(), r.statusCode);
+    }).on('error', e => console.log('[Keep-alive] error:', e.message));
+  }, 14 * 60 * 1000);
+}, 2 * 60 * 1000);
 start().catch(console.error);
 module.exports = app;
