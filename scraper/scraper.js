@@ -1065,9 +1065,9 @@ async function scrapeTimesHigherEd() {
   const start = Date.now();
   let found = 0, added = 0;
   const feeds = [
-    'https://www.timeshighereducation.com/unijobs/rss/1/',  // Communications
-    'https://www.timeshighereducation.com/unijobs/rss/2/', // Editing/Publishing
-    'https://www.timeshighereducation.com/unijobs/rss/3/', // Research Support
+    'https://euraxess.ec.europa.eu/jobs/rss',  // Communications
+    'https://jobs.sciencecareers.org/jobs/rss/', // Editing/Publishing
+    'https://jobs.sciencecareers.org/jobs/rss/', // Research Support
   ];
   for (const feed of feeds) {
     try {
@@ -1110,8 +1110,8 @@ async function scrapeEuroScienceJobs() {
   let found = 0, added = 0;
   // EuroScienceJobs provides an open RSS feed covering research positions across Europe
   const feeds = [
-    'https://www.eurosciencejobs.com/rss/all/',
-    'https://www.natureindex.com/rss/jobs'
+    'https://www.nature.com/naturejobs/science/jobs.rss',
+    'https://euraxess.ec.europa.eu/jobs/rss'
   ];
   for (const feed of feeds) {
     try {
