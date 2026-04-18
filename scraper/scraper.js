@@ -1467,3 +1467,108 @@ async function scrapeScienceCareers() {
   console.log(`  ✅ Science Careers: ${added}/${found} jobs added`);
   return added;
 }
+
+// ══════════════════════════════════════════
+// ACADEMIC: Indeed RSS (public job search RSS — hard to block)
+// ══════════════════════════════════════════
+async function scrapeIndeedAcademic() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const queries = [
+    'academic+writer', 'grant+writer', 'research+writer',
+    'science+writer', 'medical+writer', 'journal+editor',
+    'academic+editor', 'dissertation+editor', 'technical+writer+university'
+  ];
+  for (const q of queries) {
+    try {
+      const res = await axios.get(`https://www.indeed.com/jobs?q=${q}&format=rss&limit=25`, {
+        headers: {
+          'User-Agent': getUA(),
+          'Accept': 'application/rss+xml, text/xml, */*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://www.indeed.com/'
+        },
+        timeout: 20000
+      });
+      const $ = cheerio.load(res.data, { xmlMode: true });
+      $('item').each((i, el) => {
+        if (i >= 25) return false;
+        const title   = $(el).find('title').text().trim();
+        const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const url     = $(el).find('link').text().trim();
+        const company = $(el).find('source').text().trim() || 'Indeed Employer';
+        if (!isWritingJob(title, desc)) return;
+        found++;
+        const pay = parsePay(desc);
+        if (insertJob({
+          title, company, country: 'United States',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+          description: desc.slice(0, 2000) || title,
+          apply_url: url, source: 'indeed_academic', source_url: url
+        })) added++;
+      });
+      await sleep(1500);
+    } catch (err) {
+      console.error(`  Indeed Academic [${q}] error:`, err.message);
+    }
+  }
+  logScrape('indeed_academic', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Indeed Academic: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// ACADEMIC: JSearch API via RapidAPI (aggregates Google for Jobs)
+// Requires RAPIDAPI_KEY env var — free tier: 100 req/day
+// ══════════════════════════════════════════
+async function scrapeJSearch() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const RAPID_KEY = process.env.RAPIDAPI_KEY || '';
+  if (!RAPID_KEY) {
+    console.log('  ⚠️ JSearch: no RAPIDAPI_KEY set, skipping');
+    return 0;
+  }
+  const queries = [
+    'academic writer', 'grant writer', 'research writer',
+    'science writer', 'medical writer', 'journal editor',
+    'university communications', 'academic editor'
+  ];
+  for (const q of queries) {
+    try {
+      const res = await axios.get('https://jsearch.p.rapidapi.com/search', {
+        params: { query: q, num_pages: '1', date_posted: 'month' },
+        headers: {
+          'X-RapidAPI-Key': RAPID_KEY,
+          'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
+        },
+        timeout: 15000
+      });
+      const jobs = res.data?.data || [];
+      for (const j of jobs) {
+        found++;
+        const desc = (j.job_description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!isWritingJob(j.job_title, desc)) continue;
+        const pay = parsePay(j.job_salary_period ? `${j.job_min_salary}-${j.job_max_salary}` : '');
+        if (insertJob({
+          title:       j.job_title,
+          company:     j.employer_name || 'Unknown Employer',
+          country:     j.job_country || 'United States',
+          pay_min:     pay.pay_min,
+          pay_max:     pay.pay_max,
+          pay_type:    j.job_employment_type || 'Full Time',
+          description: desc.slice(0, 2000) || j.job_title,
+          apply_url:   j.job_apply_link || j.job_google_link || '',
+          source:      'jsearch',
+          source_url:  j.job_apply_link || j.job_google_link || ''
+        })) added++;
+      }
+      await sleep(1000);
+    } catch (err) {
+      console.error(`  JSearch [${q}] error:`, err.message);
+    }
+  }
+  logScrape('jsearch', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ JSearch: ${added}/${found} jobs added`);
+  return added;
+}
