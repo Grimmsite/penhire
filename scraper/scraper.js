@@ -37,7 +37,13 @@ const WRITING_KEYWORDS = [
   'writ', 'content', 'copy', 'editor', 'editorial', 'blog', 'article',
   'journalist', 'reporter', 'author', 'ghostwrit',
   'technical writ', 'seo', 'social media', 'communications',
-  'marketing writ', 'creative writ', 'script', 'proofreader'
+  'marketing writ', 'creative writ', 'script', 'proofreader',
+  // Academic writing
+  'academic writ', 'research writ', 'grant writ', 'science writ',
+  'scientific writ', 'medical writ', 'scholarly', 'dissertation',
+  'academic editor', 'journal editor', 'scientific editor',
+  'research communicat', 'science communicat', 'academic communicat',
+  'publication', 'manuscript', 'peer review', 'research assistant'
 ];
 
 function isWritingJob(title, desc = '') {
@@ -920,26 +926,256 @@ async function scrapeGuardianJobs() {
   return added;
 }
 
+// ══════════════════════════════════════════
+// ACADEMIC SOURCE 1: HigherEdJobs RSS (US — largest academic job board)
+// ══════════════════════════════════════════
+async function scrapeHigherEdJobs() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  // HigherEdJobs RSS feeds by category
+  const feeds = [
+    'https://www.higheredjobs.com/rss/articlesFeed.cfm?type=2',   // Communications/Writing
+    'https://www.higheredjobs.com/rss/articlesFeed.cfm?type=11',  // Journalism
+    'https://www.higheredjobs.com/rss/articlesFeed.cfm?type=3',   // Administrative (grants/research comms)
+  ];
+  for (const feed of feeds) {
+    try {
+      const res = await axios.get(feed, {
+        headers: { 'User-Agent': getUA(), 'Accept': 'application/rss+xml, application/xml, text/xml' },
+        timeout: 15000
+      });
+      const $ = cheerio.load(res.data, { xmlMode: true });
+      $('item').each((i, el) => {
+        if (i >= 20) return false;
+        const title   = $(el).find('title').text().trim();
+        const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const url     = $(el).find('link').text().trim();
+        const company = $(el).find('institution, author').text().trim() || 'US University';
+        if (!isWritingJob(title, desc)) return;
+        found++;
+        const pay = parsePay(desc);
+        if (insertJob({
+          title, company, country: 'United States',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+          description: desc.slice(0, 2000) || title,
+          apply_url: url, source: 'higheredjobs', source_url: url
+        })) added++;
+      });
+      await sleep(700);
+    } catch (err) {
+      console.error(`  HigherEdJobs error:`, err.message);
+    }
+  }
+  logScrape('higheredjobs', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ HigherEdJobs: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// ACADEMIC SOURCE 2: Chronicle of Higher Education Jobs RSS
+// ══════════════════════════════════════════
+async function scrapeChronicleJobs() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const feeds = [
+    'https://jobs.chronicle.com/jobs/communications-marketing/rss/',
+    'https://jobs.chronicle.com/jobs/writing-editing/rss/',
+    'https://jobs.chronicle.com/jobs/research/rss/'
+  ];
+  for (const feed of feeds) {
+    try {
+      const res = await axios.get(feed, {
+        headers: { ...HEADERS, 'Referer': 'https://jobs.chronicle.com/' },
+        timeout: 15000
+      });
+      const $ = cheerio.load(res.data, { xmlMode: true });
+      $('item').each((i, el) => {
+        if (i >= 15) return false;
+        const title   = $(el).find('title').text().trim();
+        const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const url     = $(el).find('link').text().trim();
+        const company = $(el).find('dc\\:creator, creator, author').text().trim() || 'US Institution';
+        if (!isWritingJob(title, desc)) return;
+        found++;
+        const pay = parsePay(desc);
+        if (insertJob({
+          title, company, country: 'United States',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+          description: desc.slice(0, 2000) || title,
+          apply_url: url, source: 'chronicle', source_url: url
+        })) added++;
+      });
+      await sleep(700);
+    } catch (err) {
+      console.error(`  Chronicle Jobs [${feed}] error:`, err.message);
+    }
+  }
+  logScrape('chronicle', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Chronicle Higher Ed Jobs: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// ACADEMIC SOURCE 3: Inside Higher Ed Careers RSS
+// ══════════════════════════════════════════
+async function scrapeInsideHigherEd() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const feeds = [
+    'https://careers.insidehighered.com/jobs/rss/?field=Communications+%26+Marketing',
+    'https://careers.insidehighered.com/jobs/rss/?field=Writing+%26+Editing'
+  ];
+  for (const feed of feeds) {
+    try {
+      const res = await axios.get(feed, {
+        headers: { ...HEADERS, 'Referer': 'https://careers.insidehighered.com/' },
+        timeout: 15000
+      });
+      const $ = cheerio.load(res.data, { xmlMode: true });
+      $('item').each((i, el) => {
+        if (i >= 15) return false;
+        const title   = $(el).find('title').text().trim();
+        const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const url     = $(el).find('link').text().trim();
+        const company = $(el).find('dc\\:creator, creator').text().trim() || 'Higher Ed Institution';
+        if (!isWritingJob(title, desc)) return;
+        found++;
+        const pay = parsePay(desc);
+        if (insertJob({
+          title, company, country: 'United States',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+          description: desc.slice(0, 2000) || title,
+          apply_url: url, source: 'insidehighered', source_url: url
+        })) added++;
+      });
+      await sleep(700);
+    } catch (err) {
+      console.error(`  Inside Higher Ed [${feed}] error:`, err.message);
+    }
+  }
+  logScrape('insidehighered', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Inside Higher Ed: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// ACADEMIC SOURCE 4: Times Higher Education Jobs RSS (UK/Global)
+// ══════════════════════════════════════════
+async function scrapeTimesHigherEd() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const feeds = [
+    'https://www.timeshighereducation.com/unijobs/rss/?JobTypeID=5',  // Communications
+    'https://www.timeshighereducation.com/unijobs/rss/?JobTypeID=13', // Editing/Publishing
+    'https://www.timeshighereducation.com/unijobs/rss/?JobTypeID=10', // Research Support
+  ];
+  for (const feed of feeds) {
+    try {
+      const res = await axios.get(feed, {
+        headers: { ...HEADERS, 'Referer': 'https://www.timeshighereducation.com/' },
+        timeout: 15000
+      });
+      const $ = cheerio.load(res.data, { xmlMode: true });
+      $('item').each((i, el) => {
+        if (i >= 15) return false;
+        const title   = $(el).find('title').text().trim();
+        const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const url     = $(el).find('link').text().trim();
+        const company = $(el).find('company, dc\\:creator').text().trim() || 'UK/Global University';
+        if (!isWritingJob(title, desc)) return;
+        found++;
+        const pay = parsePay(desc);
+        if (insertJob({
+          title, company, country: 'United Kingdom',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+          description: desc.slice(0, 2000) || title,
+          apply_url: url, source: 'timeshighered', source_url: url
+        })) added++;
+      });
+      await sleep(700);
+    } catch (err) {
+      console.error(`  Times Higher Ed [${feed}] error:`, err.message);
+    }
+  }
+  logScrape('timeshighered', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Times Higher Education Jobs: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// ACADEMIC SOURCE 5: EuroScienceJobs RSS (Europe — research & science writing)
+// ══════════════════════════════════════════
+async function scrapeEuroScienceJobs() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  // EuroScienceJobs provides an open RSS feed covering research positions across Europe
+  const feeds = [
+    'https://www.eurosciencejobs.com/rss/',
+    'https://www.natureindex.com/rss/jobs'
+  ];
+  for (const feed of feeds) {
+    try {
+      const res = await axios.get(feed, {
+        headers: { 'User-Agent': getUA(), 'Accept': 'application/rss+xml, application/xml, text/xml' },
+        timeout: 15000
+      });
+      const $ = cheerio.load(res.data, { xmlMode: true });
+      $('item').each((i, el) => {
+        if (i >= 20) return false;
+        const title   = $(el).find('title').text().trim();
+        const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        const url     = $(el).find('link').text().trim();
+        const company = $(el).find('dc\\:creator, creator, author').text().trim() || 'European Institution';
+        if (!isWritingJob(title, desc)) return;
+        found++;
+        const pay = parsePay(desc);
+        if (insertJob({
+          title, company, country: 'Europe',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+          description: desc.slice(0, 2000) || title,
+          apply_url: url, source: 'eurosciencejobs', source_url: url
+        })) added++;
+      });
+      await sleep(700);
+    } catch (err) {
+      console.error(`  EuroScienceJobs [${feed}] error:`, err.message);
+    }
+  }
+  logScrape('eurosciencejobs', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ EuroScienceJobs: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// MAIN — runs all scrapers
+// ══════════════════════════════════════════
 async function runAllScrapers() {
   console.log(`\n🔍 PenHire Scraper starting: ${new Date().toISOString()}`);
   expireOldJobs();
 
   let total = 0;
-  total += await scrapeRemotive();       // NEW — very reliable JSON API
+  // ── General remote writing sources ──
+  total += await scrapeRemotive();
   total += await scrapeJobicy();
-  total += await scrapeWeWorkRemotely(); // fixed selector
+  total += await scrapeWeWorkRemotely();
   total += await scrapeProBlogger();
   total += await scrapeAuthenticJobs();
   total += await scrapeWorkew();
-  total += await scrapeMediaBistro();    // fixed URL
-  total += await scrapeRemoteCo();       // fixed URL + longer timeout
-  total += await scrapeJournalismJobs(); // fixed URL
-  total += await scrapeBloggingPro();    // NEW
+  total += await scrapeMediaBistro();
+  total += await scrapeRemoteCo();
+  total += await scrapeJournalismJobs();
+  total += await scrapeBloggingPro();
   total += await scrapeArbeitnow();
   total += await scrapeAdzuna();
   total += await scrapeReed();
+  // ── Academic writing sources ──
   total += await scrapeJobsAcUk();
   total += await scrapeGuardianJobs();
+  total += await scrapeHigherEdJobs();   // US — largest academic board
+  total += await scrapeChronicleJobs();  // US — Chronicle of Higher Ed
+  total += await scrapeInsideHigherEd(); // US — Inside Higher Ed Careers
+  total += await scrapeTimesHigherEd();  // UK/Global — Times Higher Education
+  total += await scrapeEuroScienceJobs();// Europe — research & science writing
 
   const activeJobs = get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1');
   console.log(`\n✅ Scrape complete. New jobs this run: ${total}`);
