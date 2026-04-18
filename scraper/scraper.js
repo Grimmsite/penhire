@@ -633,19 +633,18 @@ async function scrapeRemoteOK() {
 async function scrapeTheMuse() {
   const start = Date.now();
   let found = 0, added = 0;
-  const categories = ['Writing & Editing', 'Marketing & PR', 'Media & Journalism'];
-  for (const cat of categories) {
+  const keywords = ['writer', 'editor', 'content', 'copywriter', 'journalist'];
+  for (const kw of keywords) {
     try {
       const res = await axios.get('https://www.themuse.com/api/public/jobs', {
-        params: { category: cat, page: 0, descending: true },
+        params: { category: 'Writing', page: 0 },
         headers: { 'User-Agent': getUA(), 'Accept': 'application/json' },
         timeout: 15000
       });
-      const jobs = res.data?.results || [];
+      const jobs = (res.data?.results || []).filter(j => isWritingJob(j.name || '', ''));
       for (const j of jobs.slice(0, 15)) {
         found++;
         const desc = (j.contents || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        if (!isWritingJob(j.name, desc)) continue;
         const url = j.refs?.landing_page || '';
         if (insertJob({
           title: j.name,
@@ -656,9 +655,10 @@ async function scrapeTheMuse() {
           apply_url: url, source: 'themuse', source_url: url
         })) added++;
       }
-      await sleep(500);
+      await sleep(600);
+      break;
     } catch (err) {
-      console.error(`  TheMuse [${cat}] error:`, err.message);
+      console.error(`  TheMuse [${kw}] error:`, err.message);
     }
   }
   logScrape('themuse', found, added, 'success', '', Date.now() - start);
