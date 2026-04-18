@@ -798,10 +798,10 @@ async function scrapeJobsAcUk() {
   const start = Date.now();
   let found = 0, added = 0;
   const feeds = [
-    'https://www.jobs.ac.uk/search/?keywords=writer&resultsToShow=25&rss=1',
-    'https://www.jobs.ac.uk/search/?keywords=editor&resultsToShow=25&rss=1',
-    'https://www.jobs.ac.uk/search/?keywords=content+writer&resultsToShow=25&rss=1',
-    'https://www.jobs.ac.uk/search/?keywords=journalist&resultsToShow=25&rss=1'
+    'https://www.jobs.ac.uk/feeds/subject-areas/media-and-communications',
+    'https://www.jobs.ac.uk/feeds/subject-areas/languages-and-literature',
+    'https://www.jobs.ac.uk/feeds/subject-areas/journalism',
+    'https://www.jobs.ac.uk/feeds/type-roles/professional-or-managerial'
   ];
   for (const feed of feeds) {
     try {
@@ -883,8 +883,9 @@ async function scrapeGuardianJobs() {
   const start = Date.now();
   let found = 0, added = 0;
   const feeds = [
-    'https://jobs.theguardian.com/SearchResults.aspx?CatID=Media&format=rss',
-    'https://jobs.theguardian.com/SearchResults.aspx?CatID=Marketing&format=rss'
+    'https://jobs.theguardian.com/jobs/media/rss/',
+    'https://jobs.theguardian.com/jobs/marketing/rss/',
+    'https://jobs.theguardian.com/jobs/journalism/rss/'
   ];
   for (const feed of feeds) {
     try {
