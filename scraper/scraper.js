@@ -1172,10 +1172,10 @@ async function runAllScrapers() {
   total += await scrapeJobsAcUk();
   total += await scrapeGuardianJobs();
   total += await scrapeHigherEdJobs();   // US — largest academic board
-  total += await scrapeChronicleJobs();  // US — Chronicle of Higher Ed
-  total += await scrapeInsideHigherEd(); // US — Inside Higher Ed Careers
-  total += await scrapeTimesHigherEd();  // UK/Global — Times Higher Education
-  total += await scrapeEuroScienceJobs();// Europe — research & science writing
+  // total += await scrapeChronicleJobs();  // blocked 403  // US — Chronicle of Higher Ed
+  // total += await scrapeInsideHigherEd();  // returns 0 // US — Inside Higher Ed Careers
+  // total += await scrapeTimesHigherEd();   // blocked 404  // UK/Global — Times Higher Education
+  // total += await scrapeEuroScienceJobs(); // blocked 404// Europe — research & science writing
 
   const activeJobs = get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1');
   console.log(`\n✅ Scrape complete. New jobs this run: ${total}`);
