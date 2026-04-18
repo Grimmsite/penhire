@@ -162,7 +162,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 async function scrapeRemotive() {
   const start = Date.now();
   let found = 0, added = 0;
-  const categories = ['writing', 'marketing', 'copywriting', 'research', 'education'];
+  const categories = ['writing', 'marketing', 'copywriting'];
   for (const cat of categories) {
     try {
       const res = await axios.get('https://remotive.com/api/remote-jobs', {
@@ -205,7 +205,7 @@ async function scrapeRemotive() {
 async function scrapeJobicy() {
   const start = Date.now();
   let found = 0, added = 0;
-  const tags = ['writing', 'content', 'copywriting', 'blogging', 'editing', 'research', 'academic', 'grant'];
+  const tags = ['writing', 'content', 'copywriting', 'blogging', 'editing'];
   for (const tag of tags) {
     try {
       const res = await axios.get('https://jobicy.com/api/v2/remote-jobs', {
@@ -974,6 +974,7 @@ async function scrapeHigherEdJobs() {
 // ══════════════════════════════════════════
 // ACADEMIC SOURCE 2: Chronicle of Higher Education Jobs RSS
 // ══════════════════════════════════════════
+async function scrapeChronicleJobs() {
   const start = Date.now();
   let found = 0, added = 0;
   const feeds = [
@@ -1017,6 +1018,7 @@ async function scrapeHigherEdJobs() {
 // ══════════════════════════════════════════
 // ACADEMIC SOURCE 3: Inside Higher Ed Careers RSS
 // ══════════════════════════════════════════
+async function scrapeInsideHigherEd() {
   const start = Date.now();
   let found = 0, added = 0;
   const feeds = [
@@ -1059,6 +1061,7 @@ async function scrapeHigherEdJobs() {
 // ══════════════════════════════════════════
 // ACADEMIC SOURCE 4: Times Higher Education Jobs RSS (UK/Global)
 // ══════════════════════════════════════════
+async function scrapeTimesHigherEd() {
   const start = Date.now();
   let found = 0, added = 0;
   const feeds = [
@@ -1102,6 +1105,7 @@ async function scrapeHigherEdJobs() {
 // ══════════════════════════════════════════
 // ACADEMIC SOURCE 5: EuroScienceJobs RSS (Europe — research & science writing)
 // ══════════════════════════════════════════
+async function scrapeEuroScienceJobs() {
   const start = Date.now();
   let found = 0, added = 0;
   // EuroScienceJobs provides an open RSS feed covering research positions across Europe
@@ -1168,6 +1172,10 @@ async function runAllScrapers() {
   total += await scrapeJobsAcUk();
   total += await scrapeGuardianJobs();
   total += await scrapeHigherEdJobs();   // US — largest academic board
+  total += await scrapeChronicleJobs();  // US — Chronicle of Higher Ed
+  total += await scrapeInsideHigherEd(); // US — Inside Higher Ed Careers
+  total += await scrapeTimesHigherEd();  // UK/Global — Times Higher Education
+  total += await scrapeEuroScienceJobs();// Europe — research & science writing
 
   const activeJobs = get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1');
   console.log(`\n✅ Scrape complete. New jobs this run: ${total}`);
