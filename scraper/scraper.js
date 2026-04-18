@@ -798,10 +798,10 @@ async function scrapeJobsAcUk() {
   const start = Date.now();
   let found = 0, added = 0;
   const feeds = [
-    'https://www.jobs.ac.uk/search/?keywords=writer&format=rss',
-    'https://www.jobs.ac.uk/search/?keywords=editor&format=rss',
-    'https://www.jobs.ac.uk/search/?keywords=content&format=rss',
-    'https://www.jobs.ac.uk/search/?keywords=journalist&format=rss'
+    'https://www.jobs.ac.uk/search/?keywords=writer&type=rss',
+    'https://www.jobs.ac.uk/search/?keywords=editor&type=rss',
+    'https://www.jobs.ac.uk/search/?keywords=content+writer&type=rss',
+    'https://www.jobs.ac.uk/search/?keywords=journalist&type=rss'
   ];
   for (const feed of feeds) {
     try {
@@ -846,7 +846,7 @@ async function scrapeJobicyUK() {
   for (const tag of tags) {
     try {
       const res = await axios.get('https://jobicy.com/api/v2/remote-jobs', {
-        params: { tag, count: 20, search_region: 'uk' },
+        params: { tag, count: 50 },
         headers: { 'User-Agent': getUA(), 'Accept': 'application/json' },
         timeout: 15000
       });
