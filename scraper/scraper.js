@@ -798,10 +798,10 @@ async function scrapeJobsAcUk() {
   const start = Date.now();
   let found = 0, added = 0;
   const feeds = [
-    'https://www.jobs.ac.uk/search/?keywords=writer&type=rss',
-    'https://www.jobs.ac.uk/search/?keywords=editor&type=rss',
-    'https://www.jobs.ac.uk/search/?keywords=content+writer&type=rss',
-    'https://www.jobs.ac.uk/search/?keywords=journalist&type=rss'
+    'https://www.jobs.ac.uk/search/?keywords=writer&resultsToShow=25&rss=1',
+    'https://www.jobs.ac.uk/search/?keywords=editor&resultsToShow=25&rss=1',
+    'https://www.jobs.ac.uk/search/?keywords=content+writer&resultsToShow=25&rss=1',
+    'https://www.jobs.ac.uk/search/?keywords=journalist&resultsToShow=25&rss=1'
   ];
   for (const feed of feeds) {
     try {
@@ -883,8 +883,8 @@ async function scrapeGuardianJobs() {
   const start = Date.now();
   let found = 0, added = 0;
   const feeds = [
-    'https://jobs.theguardian.com/jobs/media/?format=rss',
-    'https://jobs.theguardian.com/jobs/marketing-pr-and-communications/?format=rss'
+    'https://jobs.theguardian.com/SearchResults.aspx?CatID=Media&format=rss',
+    'https://jobs.theguardian.com/SearchResults.aspx?CatID=Marketing&format=rss'
   ];
   for (const feed of feeds) {
     try {
@@ -938,7 +938,6 @@ async function runAllScrapers() {
   total += await scrapeAdzuna();
   total += await scrapeReed();
   total += await scrapeJobsAcUk();
-  total += await scrapeJobicyUK();
   total += await scrapeGuardianJobs();
 
   const activeJobs = get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1');
