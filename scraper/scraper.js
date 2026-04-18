@@ -745,6 +745,180 @@ async function scrapeAdzuna() {
   return added;
 }
 
+
+// ══════════════════════════════════════════
+// SOURCE: Reed.co.uk API (UK #1 job site)
+// Requires REED_API_KEY env var
+// ══════════════════════════════════════════
+async function scrapeReed() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const REED_KEY = process.env.REED_API_KEY || '';
+  if (!REED_KEY) { console.log('  ⚠️ Reed: no API key set, skipping'); return 0; }
+  const keywords = ['content writer', 'copywriter', 'technical writer', 'editor', 'journalist', 'blog writer'];
+  for (const kw of keywords) {
+    try {
+      const auth = Buffer.from(REED_KEY + ':').toString('base64');
+      const res = await axios.get('https://www.reed.co.uk/api/1.0/search', {
+        params: { keywords: kw, locationName: 'United Kingdom', resultsToTake: 25, minimumSalary: 0 },
+        headers: { 'Authorization': 'Basic ' + auth, 'User-Agent': getUA() },
+        timeout: 15000
+      });
+      const jobs = res.data?.results || [];
+      for (const j of jobs) {
+        found++;
+        const desc = (j.jobDescription || j.snippet || '').replace(/<[^>]*>/g, ' ').trim();
+        const pay = parsePay(j.maximumSalary ? `${j.minimumSalary}-${j.maximumSalary}` : '');
+        const url = j.jobUrl || `https://www.reed.co.uk/jobs/${j.jobId}`;
+        if (insertJob({
+          title: j.jobTitle,
+          company: j.employerName || 'UK Employer',
+          country: j.locationName || 'United Kingdom',
+          pay_min: pay.pay_min, pay_max: pay.pay_max,
+          pay_type: j.contractType || 'Full Time',
+          description: desc.slice(0, 2000) || j.jobTitle,
+          apply_url: j.jobUrl || url,
+          source: 'reed', source_url: url
+        })) added++;
+      }
+      await sleep(500);
+    } catch (err) {
+      console.error(`  Reed [${kw}] error:`, err.message);
+    }
+  }
+  logScrape('reed', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Reed.co.uk: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// SOURCE: jobs.ac.uk RSS (UK academic & writing jobs)
+// ══════════════════════════════════════════
+async function scrapeJobsAcUk() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const feeds = [
+    'https://www.jobs.ac.uk/search/?keywords=writer&format=rss',
+    'https://www.jobs.ac.uk/search/?keywords=editor&format=rss',
+    'https://www.jobs.ac.uk/search/?keywords=content&format=rss',
+    'https://www.jobs.ac.uk/search/?keywords=journalist&format=rss'
+  ];
+  for (const feed of feeds) {
+    try {
+      const res = await axios.get(feed, {
+        headers: { 'User-Agent': getUA() },
+        timeout: 12000
+      });
+      const $ = cheerio.load(res.data, { xmlMode: true });
+      $('item').each((i, el) => {
+        if (i >= 15) return false;
+        const title = $(el).find('title').text().trim();
+        const desc  = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
+        const url   = $(el).find('link').text().trim();
+        const company = $(el).find('publisher').text().trim() || 'UK University';
+        if (!isWritingJob(title, desc)) return;
+        found++;
+        const pay = parsePay(desc);
+        if (insertJob({
+          title, company, country: 'United Kingdom',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+          description: desc.slice(0, 2000) || title,
+          apply_url: url, source: 'jobsacuk', source_url: url
+        })) added++;
+      });
+      await sleep(600);
+    } catch (err) {
+      console.error(`  jobs.ac.uk error:`, err.message);
+    }
+  }
+  logScrape('jobsacuk', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ jobs.ac.uk: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// SOURCE: Jobicy UK region filter
+// ══════════════════════════════════════════
+async function scrapeJobicyUK() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const tags = ['writing', 'content', 'copywriting'];
+  for (const tag of tags) {
+    try {
+      const res = await axios.get('https://jobicy.com/api/v2/remote-jobs', {
+        params: { tag, count: 20, search_region: 'uk' },
+        headers: { 'User-Agent': getUA(), 'Accept': 'application/json' },
+        timeout: 15000
+      });
+      const jobs = res.data?.jobs || [];
+      for (const j of jobs) {
+        found++;
+        const desc = (j.jobDescription || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!isWritingJob(j.jobTitle, desc)) continue;
+        const pay = parsePay(j.annualSalaryMin ? `${j.annualSalaryMin}-${j.annualSalaryMax}` : '');
+        if (insertJob({
+          title: j.jobTitle,
+          company: j.companyName || 'UK Company',
+          country: 'United Kingdom',
+          pay_min: pay.pay_min, pay_max: pay.pay_max,
+          pay_type: j.jobType || 'Full Time',
+          description: desc.slice(0, 2000) || j.jobTitle,
+          apply_url: j.url || '', source: 'jobicy_uk', source_url: j.url || ''
+        })) added++;
+      }
+      await sleep(600);
+    } catch (err) {
+      console.error(`  Jobicy UK [${tag}] error:`, err.message);
+    }
+  }
+  logScrape('jobicy_uk', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Jobicy UK: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// SOURCE: Guardian Jobs RSS (UK quality journalism jobs)
+// ══════════════════════════════════════════
+async function scrapeGuardianJobs() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const feeds = [
+    'https://jobs.theguardian.com/jobs/media/?format=rss',
+    'https://jobs.theguardian.com/jobs/marketing-pr-and-communications/?format=rss'
+  ];
+  for (const feed of feeds) {
+    try {
+      const res = await axios.get(feed, {
+        headers: { 'User-Agent': getUA() },
+        timeout: 12000
+      });
+      const $ = cheerio.load(res.data, { xmlMode: true });
+      $('item').each((i, el) => {
+        if (i >= 15) return false;
+        const title   = $(el).find('title').text().trim();
+        const desc    = $(el).find('description').text().replace(/<[^>]*>/g, ' ').trim();
+        const url     = $(el).find('link').text().trim();
+        const company = $(el).find('company').text().trim() || 'UK Employer';
+        if (!isWritingJob(title, desc)) return;
+        found++;
+        const pay = parsePay(desc);
+        if (insertJob({
+          title, company, country: 'United Kingdom',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+          description: desc.slice(0, 2000) || title,
+          apply_url: url, source: 'guardianjobs', source_url: url
+        })) added++;
+      });
+      await sleep(500);
+    } catch (err) {
+      console.error(`  Guardian Jobs error:`, err.message);
+    }
+  }
+  logScrape('guardianjobs', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Guardian Jobs: ${added}/${found} jobs added`);
+  return added;
+}
+
 async function runAllScrapers() {
   console.log(`\n🔍 PenHire Scraper starting: ${new Date().toISOString()}`);
   expireOldJobs();
@@ -762,6 +936,10 @@ async function runAllScrapers() {
   total += await scrapeBloggingPro();    // NEW
   total += await scrapeArbeitnow();
   total += await scrapeAdzuna();
+  total += await scrapeReed();
+  total += await scrapeJobsAcUk();
+  total += await scrapeJobicyUK();
+  total += await scrapeGuardianJobs();
 
   const activeJobs = get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1');
   console.log(`\n✅ Scrape complete. New jobs this run: ${total}`);
