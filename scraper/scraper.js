@@ -625,6 +625,125 @@ async function scrapeRemoteOK() {
 // ══════════════════════════════════════════
 // MAIN — runs all scrapers
 // ══════════════════════════════════════════
+
+// ══════════════════════════════════════════
+// SOURCE: The Muse API (free, no auth needed)
+// ══════════════════════════════════════════
+async function scrapeTheMuse() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const categories = ['Writing & Editing', 'Marketing & PR', 'Media & Journalism'];
+  for (const cat of categories) {
+    try {
+      const res = await axios.get('https://www.themuse.com/api/public/jobs', {
+        params: { category: cat, page: 0, descending: true },
+        headers: { 'User-Agent': getUA(), 'Accept': 'application/json' },
+        timeout: 15000
+      });
+      const jobs = res.data?.results || [];
+      for (const j of jobs.slice(0, 15)) {
+        found++;
+        const desc = (j.contents || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (!isWritingJob(j.name, desc)) continue;
+        const url = j.refs?.landing_page || '';
+        if (insertJob({
+          title: j.name,
+          company: j.company?.name || 'Remote Company',
+          country: j.locations?.[0]?.name || 'Remote',
+          pay_min: 30, pay_max: 80, pay_type: j.type || 'Full Time',
+          description: desc.slice(0, 2000) || j.name,
+          apply_url: url, source: 'themuse', source_url: url
+        })) added++;
+      }
+      await sleep(500);
+    } catch (err) {
+      console.error(`  TheMuse [${cat}] error:`, err.message);
+    }
+  }
+  logScrape('themuse', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ TheMuse: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// SOURCE: Arbeitnow API (free, no auth, remote jobs)
+// ══════════════════════════════════════════
+async function scrapeArbeitnow() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  try {
+    const res = await axios.get('https://www.arbeitnow.com/api/job-board-api', {
+      params: { page: 1 },
+      headers: { 'User-Agent': getUA(), 'Accept': 'application/json' },
+      timeout: 15000
+    });
+    const jobs = res.data?.data || [];
+    for (const j of jobs) {
+      const desc = (j.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!isWritingJob(j.title, desc)) continue;
+      found++;
+      const pay = parsePay(desc);
+      if (insertJob({
+        title: j.title,
+        company: j.company_name || 'Remote Company',
+        country: j.location || 'Remote',
+        pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+        description: desc.slice(0, 2000) || j.title,
+        apply_url: j.url || '', source: 'arbeitnow', source_url: j.url || ''
+      })) added++;
+    }
+  } catch (err) {
+    console.error('  Arbeitnow error:', err.message);
+  }
+  logScrape('arbeitnow', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Arbeitnow: ${added}/${found} jobs added`);
+  return added;
+}
+
+// ══════════════════════════════════════════
+// SOURCE: Adzuna API (free tier, 200 req/day)
+// ══════════════════════════════════════════
+async function scrapeAdzuna() {
+  const start = Date.now();
+  let found = 0, added = 0;
+  const APP_ID = process.env.ADZUNA_APP_ID || '';
+  const APP_KEY = process.env.ADZUNA_APP_KEY || '';
+  if (!APP_ID || !APP_KEY) {
+    console.log('  ⚠️ Adzuna: no API credentials set, skipping');
+    return 0;
+  }
+  const keywords = ['content writer', 'copywriter', 'technical writer', 'blog writer'];
+  for (const kw of keywords) {
+    try {
+      const res = await axios.get(`https://api.adzuna.com/v1/api/jobs/gb/search/1`, {
+        params: { app_id: APP_ID, app_key: APP_KEY, what: kw, results_per_page: 20, content_type: 'application/json' },
+        headers: { 'User-Agent': getUA() },
+        timeout: 15000
+      });
+      const jobs = res.data?.results || [];
+      for (const j of jobs) {
+        found++;
+        const desc = (j.description || '').replace(/<[^>]*>/g, ' ').trim();
+        const pay = parsePay(j.salary_max ? `${j.salary_min}-${j.salary_max}` : '');
+        if (insertJob({
+          title: j.title,
+          company: j.company?.display_name || 'Company',
+          country: j.location?.display_name || 'Remote',
+          pay_min: pay.pay_min, pay_max: pay.pay_max, pay_type: 'Full Time',
+          description: desc.slice(0, 2000) || j.title,
+          apply_url: j.redirect_url || '', source: 'adzuna', source_url: j.redirect_url || ''
+        })) added++;
+      }
+      await sleep(500);
+    } catch (err) {
+      console.error(`  Adzuna [${kw}] error:`, err.message);
+    }
+  }
+  logScrape('adzuna', found, added, 'success', '', Date.now() - start);
+  console.log(`  ✅ Adzuna: ${added}/${found} jobs added`);
+  return added;
+}
+
 async function runAllScrapers() {
   console.log(`\n🔍 PenHire Scraper starting: ${new Date().toISOString()}`);
   expireOldJobs();
@@ -640,6 +759,9 @@ async function runAllScrapers() {
   total += await scrapeRemoteCo();       // fixed URL + longer timeout
   total += await scrapeJournalismJobs(); // fixed URL
   total += await scrapeBloggingPro();    // NEW
+  total += await scrapeTheMuse();
+  total += await scrapeArbeitnow();
+  total += await scrapeAdzuna();
   total += await scrapeHimalayas();      // better headers
   total += await scrapeRemoteOK();       // better headers + delay
 
