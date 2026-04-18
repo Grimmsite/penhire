@@ -162,7 +162,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 async function scrapeRemotive() {
   const start = Date.now();
   let found = 0, added = 0;
-  const categories = ['writing', 'marketing', 'copywriting'];
+  const categories = ['writing', 'marketing', 'copywriting', 'research', 'education'];
   for (const cat of categories) {
     try {
       const res = await axios.get('https://remotive.com/api/remote-jobs', {
@@ -205,7 +205,7 @@ async function scrapeRemotive() {
 async function scrapeJobicy() {
   const start = Date.now();
   let found = 0, added = 0;
-  const tags = ['writing', 'content', 'copywriting', 'blogging', 'editing'];
+  const tags = ['writing', 'content', 'copywriting', 'blogging', 'editing', 'research', 'academic', 'grant'];
   for (const tag of tags) {
     try {
       const res = await axios.get('https://jobicy.com/api/v2/remote-jobs', {
@@ -1172,9 +1172,9 @@ async function runAllScrapers() {
   total += await scrapeJobsAcUk();
   total += await scrapeGuardianJobs();
   total += await scrapeHigherEdJobs();
-  total += await scrapeIdealist();
-  total += await scrapeWorkInHigherEd();
-  total += await scrapeHERCJobs();   // US — largest academic board
+  // total += await scrapeIdealist();      // 404
+  // total += await scrapeWorkInHigherEd(); // ENOTFOUND
+  // total += await scrapeHERCJobs();       // 404   // US — largest academic board
   // total += await scrapeChronicleJobs();  // blocked 403  // US — Chronicle of Higher Ed
   // total += await scrapeInsideHigherEd();  // returns 0 // US — Inside Higher Ed Careers
   // total += await scrapeTimesHigherEd();   // blocked 404  // UK/Global — Times Higher Education
