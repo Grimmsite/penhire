@@ -760,11 +760,8 @@ async function runAllScrapers() {
   total += await scrapeRemoteCo();       // fixed URL + longer timeout
   total += await scrapeJournalismJobs(); // fixed URL
   total += await scrapeBloggingPro();    // NEW
-  total += await scrapeTheMuse();
   total += await scrapeArbeitnow();
   total += await scrapeAdzuna();
-  total += await scrapeHimalayas();      // better headers
-  total += await scrapeRemoteOK();       // better headers + delay
 
   const activeJobs = get('SELECT COUNT(*) as c FROM jobs WHERE is_active = 1');
   console.log(`\n✅ Scrape complete. New jobs this run: ${total}`);
