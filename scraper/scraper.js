@@ -1185,7 +1185,7 @@ async function runAllScrapers() {
   // total += await scrapeNewScientistJobs();
   // total += await scrapeHNet();
   // total += await scrapeScienceCareers();
-  total += await scrapeIndeedAcademic();
+  // total += await scrapeIndeedAcademic(); // 403
   total += await scrapeJSearch();
   // total += await scrapeIdealist();      // 404
   // total += await scrapeWorkInHigherEd(); // ENOTFOUND
