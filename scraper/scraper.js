@@ -1544,7 +1544,7 @@ async function scrapeJSearch() {
           'X-RapidAPI-Key': RAPID_KEY,
           'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
         },
-        timeout: 15000
+        timeout: 30000
       });
       const jobs = res.data?.data || [];
       for (const j of jobs) {
