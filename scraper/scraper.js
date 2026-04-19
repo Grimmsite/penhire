@@ -183,7 +183,7 @@ async function scrapeRemotive() {
       for (const j of jobs) {
         found++;
         const desc = (j.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-        if (!isWritingJob(j.title, desc)) continue;
+        // filter loosened — category already scoped
         const pay = parsePay(j.salary || '');
         if (insertJob({
           title:       j.title,
@@ -696,7 +696,7 @@ async function scrapeArbeitnow() {
     const jobs = res.data?.data || [];
     for (const j of jobs) {
       const desc = (j.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-      if (!isWritingJob(j.title, desc)) continue;
+      // filter loosened — category already scoped
       found++;
       const pay = parsePay(desc);
       if (insertJob({
