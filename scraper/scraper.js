@@ -1178,13 +1178,15 @@ async function runAllScrapers() {
   total += await scrapeAdzuna();
   total += await scrapeReed();
   // ── Academic writing sources ──
-  total += await scrapeJobsAcUk();
-  total += await scrapeGuardianJobs();
-  total += await scrapeHigherEdJobs();
-  total += await scrapePhilJobs();
-  total += await scrapeNewScientistJobs();
-  total += await scrapeHNet();
-  total += await scrapeScienceCareers();
+  // total += await scrapeJobsAcUk();
+  // total += await scrapeGuardianJobs();
+  // total += await scrapeHigherEdJobs();
+  // total += await scrapePhilJobs();
+  // total += await scrapeNewScientistJobs();
+  // total += await scrapeHNet();
+  // total += await scrapeScienceCareers();
+  total += await scrapeIndeedAcademic();
+  total += await scrapeJSearch();
   // total += await scrapeIdealist();      // 404
   // total += await scrapeWorkInHigherEd(); // ENOTFOUND
   // total += await scrapeHERCJobs();       // 404   // US — largest academic board
