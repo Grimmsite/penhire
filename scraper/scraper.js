@@ -241,7 +241,7 @@ async function scrapeJobicy() {
           source_url:  j.url || ''
         })) added++;
       }
-      await sleep(400);
+      await sleep(1200);
     } catch (err) {
       console.error(`  Jobicy [${tag}] error:`, err.message);
     }
